@@ -1,0 +1,8 @@
+# CPU build requirements
+pillow>=8.4.0
+opencv-python>=4.7.0
+numpy>=1.5.0
+albumentations>=1.3.0
+customtkinter==4.0.2
+wand>=0.6.11
+pyyaml>=6.0
