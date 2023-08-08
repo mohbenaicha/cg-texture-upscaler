@@ -1,0 +1,28 @@
+General UI:
+
+- Select a directory to process							CTRL + O
+- Export selected images								CTRL + E
+
+
+Search filters:
+
+- Clear all fields										Esc
+- Apply search fields to the current list				Enter
+- Apply search fields to selected directory				Shift+Enter
+
+Listbox:
+
+- Refresh item(s) in the listbox						F5
+- Delete currently selected item(s)						Delete									
+- Delete currently unselected item(s)					Shift+Delete
+- Preview currently selected item(s)					Enter
+- Open currently selected item(s) using default program Shift + O
+
+Load Configuration Window
+
+- Delete selected configuration(s)						Delete
+ 
+
+Miscellaneous
+
+- Close top windows, warning messages					Esc
