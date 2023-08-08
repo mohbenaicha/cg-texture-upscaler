@@ -1,0 +1,17 @@
+build/
+LICENSE
+app_config/
+logs/
+saved_models/
+user_config/
+weight_backups/
+weights/
+src/
+tests/
+.vscode/
+dist/
+*.egg-info/
+__pycache__/
+.ipynb_checkpoints/
+upscaler.ico
+*/__pycache__/
