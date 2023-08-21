@@ -18,6 +18,11 @@ This repo contains the source code for the official CG Texture Upscaler, a tool 
 1. Download the initial release here: https://www.mohamedbenaicha.com/upscaler
 2. Simply run through the ```CGTextureUpscaler.exe``` (your AV may prompt you to give it r/w/x permissions upon launch or upon export)
 
+**To use the release version cli:**
+
+1. Download the initial release here: https://www.mohamedbenaicha.com/upscaler
+2. Simply run through the ```CGTextureUpscaler.exe``` with the supported command line arguments stated in the guide. 
+
 *Additional notes:*
 
 1. ```cli_main.py``` code was added primarily as a placeholder
