@@ -1,0 +1,37 @@
+Using the CLI
+
+The cli can be accessed by executing CGTextureUpscaler.exe through a terminal, and passing in the supported arguments:
+
+
+CGTextureUpscaler.exe --source_location 'c:\user\johndoe\my_images' --export_location 'original_location' -r --device gpu --scale 2x --export_format bmp --compression rle --and_filters tga  --or_filters nrm bc metallic mask -v -id --prefix rle --suffix 2x 
+
+
+The arguments that the CLI accepts include:
+
+--device: the device to use when processing the selected images, supports values {cpu,cuda} (where cuda is gpu) (ex: --device cuda )
+
+--scale: the scale factor to use to upscale the selected images, supports values {none,2x,4x} (example: --scale 2x )
+
+--export_format: the export format of the images to be processed, supports values {tga,dds,png,jpg,bmp,exr} (ex: --export_format tga )
+
+--and_filters: a list of strings separated by a space that will cause ONLY the image names that contain all of the 'and' filters to be processed ( --and_filters tga nrm )
+
+--or_filters: a list of strings separated by a space that will cause image names with any of the 'or' filters to be processed regardless of the 'and' filters used ( --and_filters tga nrm )
+
+--compression: the compression algorithm for the image format you are processing, can take values: {dxt1,dxt3,dxt5,jpeg,losslessjpeg,piz,pxr24,rle,undefined,zip,zips} (ex: --compression dxt5)
+
+--mipmaps: for Direct Draw Surface image formats, can take values: {max,75%,50%,25%,none} (ex: -mipmaps 50%)
+
+--prefix: a prefix string to add to the saved file name(s) that does not include any of the following illegal characters *:?<>"|/\\   (ex: --prefix dxt5_50_mips)
+
+--suffix: a suffix string to add to the saved file name(s) that does not include any of the following illegal characters *:?<>"|/\\   (ex: 2x_up)
+
+--unique_id (or -id): a flag that when included gives a unique value to each image name that is saved (ex: -id)
+
+--recursive (or -r): a flag that when included means all of the files in the chosen folder as well as subfolder of the chosen source_location that match the indicated filters will be processed(see below) (ex: -r)
+
+--verbose (or -v): a flag that that when included will print processing info to the console (terminal) (ex: -v)
+
+--source_location: the folder(s) containing the image file(s) you wish to process; this argument should be put in between single quotes, supports values {single path location} (ex: --source_location 'c:\users\johndoe\my_images')
+
+--export_location: the target folder to which to export the processed image file(s), supports values {original_location, single path location}. This argument should be put in between single quotes. If  the 'original_location' is passed as the argument, the images are saved in the place where they currently exist, if no id, prefix or suffix values are give, and if the export image format is the same as the original image format, the image file will be overwritten(ex: --export_location 'c:\users\johndoe\upscaled_images' | --export_location 'original_location')
