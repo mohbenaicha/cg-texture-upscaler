@@ -228,11 +228,11 @@ class ExportFrame(ctk.CTkFrame):
                         exp_ids,
                         self.progbar,
                         self.stop_export_button,
-                        False
+                        False,
                     ),
                 )
                 disable_UI_elements(self.export_sub_frame.export_button)
-                self.export_thread.daemon = True # so the thread can be stopped likewise if the master frame is force-closed
+                self.export_thread.daemon = True  # so the thread can be stopped likewise if the master frame is force-closed
                 self.export_thread.start()
             else:
                 pass

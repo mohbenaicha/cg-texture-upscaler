@@ -13,6 +13,7 @@ from utils.events import *
 
 log_file = write_log_to_file(None, None, None)
 
+
 class SearchFilterFrame(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master)
@@ -83,7 +84,7 @@ class SearchFilterFrame(ctk.CTkFrame):
             self.button_sub_frame,
             text="Apply to Current List",
             font=fonts.buttons_font(),
-            command=lambda: SearchFilterFrame.apply_filter(self, None, "current_list"),
+            command=lambda: SearchFilterFrame.apply_filter(None, self, "current_list"),
         )
 
         self.filter_curr_list_button_tt = Hovertip_Frame(
@@ -98,7 +99,7 @@ class SearchFilterFrame(ctk.CTkFrame):
             self.button_sub_frame,
             text="Apply to Selected Directory",
             font=fonts.buttons_font(),
-            command=lambda: SearchFilterFrame.apply_filter(self, None, "chosen_dir"),
+            command=lambda: SearchFilterFrame.apply_filter(None, self, "chosen_dir"),
         )
 
         self.filter_selected_dir_button_tt = Hovertip_Frame(
@@ -142,8 +143,8 @@ class SearchFilterFrame(ctk.CTkFrame):
     @classmethod
     def apply_filter(
         cls,
-        obj,
         bind_value,
+        obj,
         source_list: str,
         and_filters: List[str] = [""],
         or_filters: List[str] = [""],
@@ -185,7 +186,7 @@ class SearchFilterFrame(ctk.CTkFrame):
                     f"*Illegal character(s) found in filters:   "
                     + " , ".join(bad_chars_found)
                 )
-                
+
                 sys.exit(1)
         else:
             # if no illegal characters are found the AND and OR fields are checked against the chosen directory
@@ -203,7 +204,10 @@ class SearchFilterFrame(ctk.CTkFrame):
                     column=1,
                 )
             TkListbox.filter(
-                obj.lb_frame if obj else None, and_filters, or_filters, source_list if obj else "chosen_directory"
+                obj.lb_frame if obj else None,
+                and_filters,
+                or_filters,
+                source_list if obj else "chosen_directory",
             )
 
     def save_and_filters(self, value, idx):
@@ -257,7 +261,8 @@ class SearchFilterFrame(ctk.CTkFrame):
         ]
         [
             self.and_filters[i].bind(
-                "<Return>", partial(self.apply_filter, source_list="current_list")
+                "<Return>",
+                partial(self.apply_filter, obj=self, source_list="current_list"),
             )
             for i in range(4)
         ]
@@ -265,7 +270,7 @@ class SearchFilterFrame(ctk.CTkFrame):
         [
             self.and_filters[i].bind(
                 "<KeyPress-Shift_L><Return>",
-                partial(self.apply_filter, source_list="chosen_dir"),
+                partial(self.apply_filter, obj=self, source_list="chosen_dir"),
             )
             for i in range(4)
         ]
@@ -283,7 +288,8 @@ class SearchFilterFrame(ctk.CTkFrame):
         ]
         [
             self.or_filters[i].bind(
-                "<Return>", partial(self.apply_filter, source_list="current_list")
+                "<Return>",
+                partial(self.apply_filter, obj=self, source_list="current_list"),
             )
             for i in range(4)
         ]
@@ -291,7 +297,7 @@ class SearchFilterFrame(ctk.CTkFrame):
         [
             self.or_filters[i].bind(
                 "<KeyPress-Shift_L><Return>",
-                partial(self.apply_filter, source_list="chosen_dir"),
+                partial(self.apply_filter, obj=self, source_list="chosen_dir"),
             )
             for i in range(4)
         ]

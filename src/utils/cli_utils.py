@@ -134,7 +134,9 @@ def clean_args(args):
             f"[ERROR] Either the source location or export location is not a valid location.",
             log_file,
         )
-        print("[ERROR] Either the source location or export location is not a valid location.")
+        print(
+            "[ERROR] Either the source location or export location is not a valid location."
+        )
         sys.exit(1)
 
     # clean pre/suffix
@@ -147,9 +149,10 @@ def clean_args(args):
                 f"{serconf.illegal_search_characters}",
                 log_file,
             )
-            print(f"[ERROR] Found an illegal character(s) in the prefix or suffix. Ensure you don't have a any of these characters in your prefix or suffix \n"
-                  f"{serconf.illegal_search_characters}",
-                  )
+            print(
+                f"[ERROR] Found an illegal character(s) in the prefix or suffix. Ensure you don't have a any of these characters in your prefix or suffix \n"
+                f"{serconf.illegal_search_characters}",
+            )
             sys.exit(1)
 
     # 2. populate image cache using TKListbox.populate
@@ -169,7 +172,9 @@ def clean_args(args):
             "No images that match the filters were found in the source location. Did you mean to add the recursive flag (-r) ?",
             log_file,
         )
-        print("[WARNING] No images that match the filters were found in the source location. Did you mean to add the recursive flag? (-r)?")
+        print(
+            "[WARNING] No images that match the filters were found in the source location. Did you mean to add the recursive flag? (-r)?"
+        )
         sys.exit(0)
 
     export_config = {
@@ -190,7 +195,6 @@ def clean_args(args):
         if args.export_location != "original_location"
         else "",
         "verbose": args.verbose,
-        "custom_weights": None
-        
+        "custom_weights": None,
     }
     return export_config

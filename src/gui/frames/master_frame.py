@@ -77,9 +77,7 @@ class MasterFrame(ctk.CTk):
             master=self.left_column, lb_frame=self.file_browser_lb, width=self.w // 2
         )
 
-        self.bind(
-            "<Control-e>", self.export_frame.export_event
-        )
+        self.bind("<Control-e>", self.export_frame.export_event)
         self.app_and_ui_opts_frame = AppAndUIOptions(
             master=self.left_column,
             fof_frame=self.fof_frame,

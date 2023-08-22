@@ -282,7 +282,6 @@ class TkListbox(ctk.CTkFrame):
                 else:
                     counter += 1
             except IndexError:
-                print(f"Exception: {counter}, removing {imcache[0][counter]}")
                 imcache[0].pop(counter)
                 imcache[1].pop(counter)
 
@@ -351,12 +350,16 @@ class TkListbox(ctk.CTkFrame):
             if os.path.isdir(parent):
                 if recursive:
                     TkListbox.handle_recursive_dir_walk(
-                        obj, parent, imcache, update_lb=True#False
+                        obj, parent, imcache, update_lb=True  # False
                     )
                 else:
-                    TkListbox.handle_single_dir(obj, parent, imcache, update_lb=True)#False)
+                    TkListbox.handle_single_dir(
+                        obj, parent, imcache, update_lb=True
+                    )  # False)
             else:  # otherwise, we're dealing with a file
-                TkListbox.handle_single_file(obj, parent, imcache, update_lb=True)#False)
+                TkListbox.handle_single_file(
+                    obj, parent, imcache, update_lb=True
+                )  # False)
 
         if thread:
             Thread(target=populate_task).start()

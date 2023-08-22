@@ -126,8 +126,8 @@ class SaveConfigWindow(ctk.CTkToplevel):
             if not ExportConfig.single_export_location == None
             else "",
         }
-        if not os.path.exists('user_config'):
-            os.mkdir('user_config')
+        if not os.path.exists("user_config"):
+            os.mkdir("user_config")
         with open(os.path.join("user_config", f"{fn}.cfg"), "w") as yamlfile:
             yaml.dump(conf, yamlfile)
         yamlfile.close()
@@ -228,8 +228,8 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.refresh_config_button.grid(row=1, column=3, padx=5, pady=5)
 
     def populate_lb(self):
-        if not os.path.exists('user_config'):
-            os.mkdir('user_config')
+        if not os.path.exists("user_config"):
+            os.mkdir("user_config")
         config_files = [file[:-4] for file in os.listdir("user_config")]
         self.listbox.configure_listbox(listvariable=config_files)
 

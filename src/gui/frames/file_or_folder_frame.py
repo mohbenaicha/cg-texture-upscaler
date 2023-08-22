@@ -137,4 +137,6 @@ class FileOrFolderFrame(ctk.CTkFrame):
 
     def recursive_checkbox_event(self):
         SearchConfig.recursive = self.recursive.get()
-        TkListbox.populate(self.lb_frame, self.selection.get(), self.recursive.get(), add=False)
+        TkListbox.populate(
+            self.lb_frame, self.selection.get(), self.recursive.get(), add=False
+        )

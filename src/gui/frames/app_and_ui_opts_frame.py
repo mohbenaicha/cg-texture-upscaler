@@ -91,7 +91,6 @@ class AppAndUIOptions(ctk.CTkFrame):
             font=fonts.labels_font(),
         )
 
-    
         self.decrease_gui_scale_button_tt = Hovertip_Frame(
             anchor_widget=self.increase_gui_scale_button,
             text=ttt.increase_gui_scale,
