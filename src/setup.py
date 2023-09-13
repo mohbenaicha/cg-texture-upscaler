@@ -24,9 +24,9 @@ build_exe_options = {
 base = "Win32GUI" if sys.platform == "win32" else None
 
 setup(
-    name="CG Texture Upscaler",
-    version="0.2",
-    author="Mohamed Beniacha",
+    name="CG Texture Studio",
+    version="Nill",
+    author="Adam Kosha",
     description="",
     options={"build_exe": build_exe_options},
     executables=[Executable("main.py", base=base, icon="upscaler.ico")],

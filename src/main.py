@@ -9,6 +9,8 @@ from utils.cli_utils import clean_args, parser
 
 
 def main(args: Union[Dict[str, int | str | float], None]):
+    ''' Main program driver that executes a GUI loop or initiates an export
+    thread based on the user's parsed and cleaned command line parameters.'''
     if len(sys.argv) > 1:
         export_config = clean_args(args)
         export_thread = ExportThread(

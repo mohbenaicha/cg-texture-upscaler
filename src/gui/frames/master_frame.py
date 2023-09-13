@@ -14,7 +14,7 @@ from utils.events import select_fof_event
 class MasterFrame(ctk.CTk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.title(kwargs.get("title", "CG Texture Upscaler"))
+        self.title(kwargs.get("title", "TextureSuperRez"))
         self.wm_attributes("-alpha", 0.99)
         self.w = kwargs.get("width", GUIConfig.master_default_width)
         self.h = kwargs.get("width", GUIConfig.master_default_height)

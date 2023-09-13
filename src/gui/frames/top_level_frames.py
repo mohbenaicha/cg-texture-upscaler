@@ -570,7 +570,6 @@ class CopyFilesWindow(ctk.CTkToplevel):
             width=300,
             textvariable=self.entry_value,
         )
-        # self.selected_fof.bind("<KeyRelease>", self.set_copy_location)
 
         self.button_frame = ctk.CTkFrame(
             self, height=5, width=100, fg_color="transparent", bg_color="transparent"
@@ -621,11 +620,7 @@ class CopyFilesWindow(ctk.CTkToplevel):
         self.browse.grid(row=1, column=2, padx=5, pady=5)
         self.cancel.grid(row=1, column=3, padx=5, pady=5)
 
-    # def set_copy_location(self, value):
-    # ExportConfig.copy_location = self.entry_value.get()
-
     def confirm_button_event(self, value):
-        # self.entryfield.set(value=ExportConfig.copy_location)
         proceed = True
         illegal_symbols = SearchConfig.illegal_search_characters - {":", "\\", "/"}
         if self.selected_fof.get() == "" or any(

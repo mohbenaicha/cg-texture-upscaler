@@ -114,10 +114,12 @@ parser.add_argument(
 
 
 def clean_args(args):
+    ''' Handles user's command line arguments.'''
     # 0. Setup log file and args object
     log_file = write_log_to_file(None, None, None)
     parser.parse_args()
 
+    
     # 1. Clean args
 
     # ensure source/target locations are valid

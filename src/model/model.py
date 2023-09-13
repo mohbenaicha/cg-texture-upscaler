@@ -14,7 +14,7 @@ class RESRGAN:
             scale=scale,
         )
 
-    def load_weights(self, model_path, download=True):
+    def load_weights(self, model_path):
 
         loadnet = torch.load(model_path)
         if "params" in loadnet:

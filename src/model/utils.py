@@ -15,8 +15,7 @@ from wand.image import Image as wand_image
 from utils.events import enable_UI_elements
 from .rrdbnet_arch import Generator
 from caches.cache import image_paths_cache as im_cache
-from app_config.config import PrePostProcessingConfig as ppconf
-
+from app_config.config import (PrePostProcessingConfig as ppconf, ExportConfig)
 
 def pad_reflect(image, pad_size):
     imsize = image.shape
@@ -100,8 +99,8 @@ def calc_mipmaps(user_choice, image):
         user_choice = float(1)
     else:
         user_choice = float(user_choice[:-1]) / 100
-    max_mipmaps = math.log2(min(image.size))
-    return str(round(user_choice * max_mipmaps, 0))
+    limiting_dim = math.log2(min(image.size))
+    return str(round(user_choice * limiting_dim, 0))
 
 
 def handle_mipmaps(export_config, img):
@@ -122,11 +121,12 @@ def handle_naming(export_config, im_name, index):
     return im_name
 
 
-def load_model(device, scale):
+def load_model(device, scale, load:bool=True):
     from model import RESRGAN
 
     model = RESRGAN(device=device, scale=scale)
-    model.load_weights(f"saved_models/{scale}x.pth", download=False)
+    if load:
+        model.load_weights(os.path.join(ExportConfig.weight_file, f"{scale}x.pth"))
     return model.gen
 
 
@@ -182,7 +182,7 @@ def export_images(
         )
         warning_mssg = True if master else False
         process = False
-
+    print("processing...")
     if process:
         cache_copy = deepcopy(im_cache)
 
@@ -225,6 +225,7 @@ def export_images(
             generator = None
 
         if process:
+            print("processing...")
             for i in export_indices:
                 im_name, im_path = cache_copy[0][i], cache_copy[1][i]
                 img = os.path.join(im_path, im_name)
@@ -289,7 +290,6 @@ def export_images(
                                     + upscaled_alpha[2] * (0.1140)
                                 )
                                 upscaled_img = torch.cat(
-                                    # [upscaled_img, upscaled_alpha.mean(0).unsqueeze(0)], 0
                                     [upscaled_img, alpha_to_greyscale.unsqueeze(0)],
                                     0,
                                 )
@@ -338,7 +338,7 @@ def export_images(
 
                 with wand_image.from_array(img_arr) as img:
                     img.format = export_config["format"]
-                    img.compression = export_config["compression"]
+                    img.compression = export_config["compression"] if not export_config["compression"] == "none" else "no"
                     handle_mipmaps(export_config, img)
                     im_name = handle_naming(export_config, im_name, i)
 
@@ -352,6 +352,7 @@ def export_images(
                     write_log_to_file(
                         "INFO", f"Saved {im_name} to {save_path}", log_file
                     )
+                    # print(f"saved current {im_name} to {save_path}")
                     if not master and verbose:
                         print(f"\n[INFO] Saved {im_name} to {save_path}\n")
                 if master:

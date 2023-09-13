@@ -3,6 +3,7 @@ import torch
 from enum import Enum
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
+from pydantic import BaseModel, validator
 
 
 class PrePostProcessingConfig:
@@ -19,12 +20,12 @@ class PrePostProcessingConfig:
         "exr": False,
     }
     compression_map: Dict[str, Tuple] = {
-        "dds": tuple(("dxt1", "dxt3", "dxt5", "undefined")),
-        "tga": tuple(("undefined",)),  # only import 'rle'
-        "bmp": tuple(("rle", "undefined")),  # only import 'rle'
-        "jpg": tuple(("jpeg", "losslessjpeg", "undefined")),  # only import: 'jpeg2000'
-        "exr": tuple(("pxr24", "rle", "piz", "zip", "zips", "undefined")),
-        "png": tuple(("undefined",)),
+        "dds": tuple(("none", "dxt1", "dxt3", "dxt5")),
+        "tga": tuple(("none", "rle")),
+        "bmp": tuple(("none")),
+        "jpg": tuple(("none", "jpeg", "losslessjpeg")),
+        "exr": tuple(("none", "pxr24", "rle", "piz", "zip", "zips")),
+        "png": tuple(("none",)),
     }
     test_transform: A.Compose = A.Compose(
         [
@@ -65,22 +66,20 @@ class ExportConfig:
     device: str = available_devices[0]
     scale: int = PrePostProcessingConfig.available_scales[0]
     export_format: str = "tga"
-    compression: str = "undefined"
-    active_compression: List[
+    compression: str = "none"
+    active_compression: Tuple[
         Union[str, None]
     ] = PrePostProcessingConfig.compression_map[export_format]
     mipmaps: str = "none"
-    filters: List[str] = [""]
     save_numbering: bool = False
     save_prefix: str = ""
     save_suffix: str = ""
     single_export_location: Union[str, None] = ""
     save_in_existing_location: bool = False
-    weight_file: Union[str, None] = None
-    copy_location: str = ""
     # TODO: implement
-    denoise_factor: Union[float, None] = None
-    sharpness_factor: Union[float, None] = None
+    weight_file: Union[str, None] = "saved_models"
+    # denoise_factor: Union[float, None] = None
+    # sharpness_factor: Union[float, None] = None
 
 
 class GUIScale(Enum):
@@ -120,3 +119,5 @@ class GUIConfig:
     current_theme: str = "dark"
     rel_config_path: str = "./user_config/"
     rel_log_path: str = "./logs/"
+
+

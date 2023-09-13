@@ -73,7 +73,7 @@ class ResidualBlockNoBN(nn.Module):
 class Upsample(nn.Sequential):
     """Upsample module.
     Args:
-        scale (int): Scale factor. Supported scales: 2^n and 3.
+        scale (int): Scale factor. Supported scales: 2^2 and 2^3.
         num_feat (int): Channel number of intermediate features.
     """
 

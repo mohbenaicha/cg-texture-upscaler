@@ -8,13 +8,14 @@ from gui.tooltips import Hovertip_Frame
 import gui.tooltips.tooltip_text as ttt
 from gui.frames.main_listbox_frame import TkListbox
 from app_config.config import ExportConfig
-from model.utils import export_images
+from model.utils import export_images, write_log_to_file
 from utils.events import (
     enable_UI_elements,
     disable_UI_elements,
     select_fof_event,
     GUIConfig,
 )
+from utils.validation_utils import validate_export_config
 
 
 class ExportFrame(ctk.CTkFrame):
@@ -185,21 +186,27 @@ class ExportFrame(ctk.CTkFrame):
 
     def set_export_location(self, value):
         ExportConfig.single_export_location = self.selected_fof.get()
-
-    def parse_export_config(self):
-        return {
-            "device": ExportConfig.device,
-            "scale": ExportConfig.scale,
-            "format": ExportConfig.export_format,
-            "compression": ExportConfig.compression,
-            "mipmaps": ExportConfig.mipmaps,
-            "prefix": ExportConfig.save_prefix,
-            "suffix": ExportConfig.save_suffix,
-            "numbering": ExportConfig.save_numbering,
-            "export_to_original": ExportConfig.save_in_existing_location,
-            "single_export_location": ExportConfig.single_export_location,
-            "custom_weights": ExportConfig.weight_file,
-        }
+    
+    @classmethod
+    def parse_export_config(cls, config_cls):
+        valid_config, error = validate_export_config(export_config=config_cls)
+        
+        if error:
+            return False
+        else:
+            return {
+                "device": valid_config.get("device", None),
+                "scale": valid_config.get("scale", None),
+                "format": valid_config.get("export_format", None),
+                "compression": valid_config.get("compression", None),
+                "mipmaps": valid_config.get("mipmaps", None),
+                "prefix": valid_config.get("save_prefix", None),
+                "suffix": valid_config.get("save_suffix", None),
+                "numbering": valid_config.get("save_numbering", None),
+                "export_to_original": valid_config.get("save_in_existing_location", None),
+                "single_export_location": valid_config.get("single_export_location", None),
+                "weight_file": ExportConfig.weight_file,
+            }
 
     def set_export_type(self):
         if self.export_to_original.get():
@@ -215,10 +222,20 @@ class ExportFrame(ctk.CTkFrame):
             enable_UI_elements(self.export_sub_frame.browse_button)
 
     def export_event(self, value):
+        log_file = write_log_to_file(None, None, None)
         exp_ids = self.lb_frame.curselection()
         if len(exp_ids) > 0:
-            export_config = self.parse_export_config()
-            if export_config["custom_weights"] == None:
+            export_config = ExportFrame.parse_export_config(ExportConfig)
+            if not export_config:
+                write_log_to_file("Error", "Could not validate export config.", log_file)
+                CTkMessagebox(
+                title="Error Message!",
+                message=f"Failed to process current configuration.",
+                icon="warning",
+                option_1="Ok",
+            )
+            
+            else:
                 self.export_thread = ExportThread(
                     target=export_images,
                     args=(
@@ -234,8 +251,6 @@ class ExportFrame(ctk.CTkFrame):
                 disable_UI_elements(self.export_sub_frame.export_button)
                 self.export_thread.daemon = True  # so the thread can be stopped likewise if the master frame is force-closed
                 self.export_thread.start()
-            else:
-                pass
         else:
             CTkMessagebox(
                 title="Warning Message!",

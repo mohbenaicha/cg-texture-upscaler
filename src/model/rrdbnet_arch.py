@@ -1,7 +1,7 @@
 import torch
 from torch import nn as nn
 from torch.nn import functional as F
-from .arch_utils import default_init_weights
+from model.arch_utils import default_init_weights
 
 
 class DenseBlock(nn.Module):
@@ -168,3 +168,6 @@ class Generator(nn.Module):
 
         out = self.final_conv(self.act(self.pen_conv(x)))
         return out
+
+if __name__ == "__main__":
+    print(len([param for param in Generator(3,3).named_parameters()]))
