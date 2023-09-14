@@ -5,14 +5,14 @@ import customtkinter as ctk
 from gui.frames.master_frame import MasterFrame
 from model import export_images
 from gui.frames import ExportThread
-from utils.cli_utils import clean_args, parser
+from utils.cli_utils import parse_args, parser
 
 
 def main(args: Union[Dict[str, int | str | float], None]):
     ''' Main program driver that executes a GUI loop or initiates an export
     thread based on the user's parsed and cleaned command line parameters.'''
     if len(sys.argv) > 1:
-        export_config = clean_args(args)
+        export_config = parse_args(args)
         export_thread = ExportThread(
             target=export_images, args=(None, export_config, None, "all", None, None, export_config.get('verbose', False))
         )

@@ -6,7 +6,6 @@ src/saved_models/
 src/user_config/
 weight_backups/
 weights/
-tests/
 .vscode/
 src/dist/
 *.egg-info/

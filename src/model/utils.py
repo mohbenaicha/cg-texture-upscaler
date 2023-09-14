@@ -1,21 +1,27 @@
 import os
 import shutil
+from typing import List, Dict, Union, Any
 from datetime import date, datetime
 import time
+from copy import deepcopy
 import math
 import customtkinter as ctk
 from PIL import Image, UnidentifiedImageError, ImageFilter, ImageEnhance
-from copy import deepcopy
+from wand.image import Image as wand_image
+import cv2
 import numpy as np
 import torch
-
 from gui.message_box import CTkMessagebox
-from typing import List, Dict, Union
-from wand.image import Image as wand_image
 from utils.events import enable_UI_elements
 from .rrdbnet_arch import Generator
 from caches.cache import image_paths_cache as im_cache
-from app_config.config import (PrePostProcessingConfig as ppconf, ExportConfig)
+from app_config.config import PrePostProcessingConfig as ppconf, ExportConfig
+
+# to be able to read wand-exported image files
+from PIL import ImageFile
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+
 
 def pad_reflect(image, pad_size):
     imsize = image.shape
@@ -43,6 +49,15 @@ def pad_reflect(image, pad_size):
 
 def unpad_image(image, pad_size):
     return image[pad_size:-pad_size, pad_size:-pad_size, :]
+
+
+def load_model(device, scale, load: bool = True):
+    from model import RESRGAN
+
+    model = RESRGAN(device=device, scale=scale)
+    if load:
+        model.load_weights(os.path.join(ExportConfig.weight_file, f"{scale}x.pth"))
+    return model.gen
 
 
 def write_log_to_file(log_type, message, log_file=None):
@@ -112,22 +127,13 @@ def handle_mipmaps(export_config, img):
             img.options["dds:mipmaps"] = "0"
 
 
-def handle_naming(export_config, im_name, index):
+def handle_naming(export_config: dict[str, Any], im_name, index):
     id = (str(index) + "_") if export_config["numbering"] else ""
     prefix = export_config["prefix"] + ("_" if export_config["prefix"] != "" else "")
     suffix = (("_" if export_config["suffix"] != "" else "")) + export_config["suffix"]
     format = export_config["format"]
     im_name = f"{id}{prefix}{im_name[:-4]}{suffix}.{format}"
     return im_name
-
-
-def load_model(device, scale, load:bool=True):
-    from model import RESRGAN
-
-    model = RESRGAN(device=device, scale=scale)
-    if load:
-        model.load_weights(os.path.join(ExportConfig.weight_file, f"{scale}x.pth"))
-    return model.gen
 
 
 def handle_dimensions(img, im_name, log_file):
@@ -150,6 +156,42 @@ def handle_dimensions(img, im_name, log_file):
     return img
 
 
+def unsharp_mask(
+    image: np.array,
+    kernel_size: tuple = (5, 5),
+    sigma: float = 1.0,
+    amount: float = 1.0,
+    threshold: float = 0,
+):
+    """
+    Return a sharpened version of the image, using an unsharp mask.
+    Credit: Soroush (2019). https://stackoverflow.com/questions/4993082/how-can-i-sharpen-an-image-in-opencv.
+    """
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = float(amount + 1) * image - float(amount) * blurred
+    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
+    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
+    sharpened = sharpened.round().astype(np.uint8)
+    if threshold > 0:
+        low_contrast_mask = np.absolute(image - blurred) < threshold
+        np.copyto(sharpened, image, where=low_contrast_mask)
+    return sharpened
+
+
+def handle_noise(
+    noisy_image: np.array, denoised_image: np.array, scale: int, noise_factor: float
+):
+    noisy_image = unsharp_mask(
+        cv2.resize(
+            src=noisy_image,
+            dsize=tuple(dim * scale for dim in noisy_image.shape[:2][::-1]),
+            interpolation=cv2.INTER_LANCZOS4,
+        )
+    )
+    img = noisy_image * (noise_factor) + denoised_image * 255.0 * (1-noise_factor)
+    return img / 255.0
+
+
 def export_images(
     master: ctk.CTkFrame = None,
     export_config: Union[Dict[str, Union[str, int, bool]], None] = None,
@@ -165,7 +207,6 @@ def export_images(
     log_file = write_log_to_file(None, None, None)
     warning_mssg = False
     process = True
-    # while not kill_thread:
     if export_config == None:
         write_log_to_file("ERROR", f"No export config found: {export_config}", log_file)
         warning_mssg = True
@@ -182,7 +223,7 @@ def export_images(
         )
         warning_mssg = True if master else False
         process = False
-    print("processing...")
+        
     if process:
         cache_copy = deepcopy(im_cache)
 
@@ -197,11 +238,12 @@ def export_images(
             prog_bar.set(value=progress)
 
         if export_config["scale"] != "none":
+            scale = int(export_config["scale"][:1])
             try:
                 generator = (
                     load_model(
                         device=export_config["device"],
-                        scale=int(export_config["scale"][:1]),
+                        scale=scale,
                     )
                     if gen == None
                     else gen
@@ -225,7 +267,6 @@ def export_images(
             generator = None
 
         if process:
-            print("processing...")
             for i in export_indices:
                 im_name, im_path = cache_copy[0][i], cache_copy[1][i]
                 img = os.path.join(im_path, im_name)
@@ -253,6 +294,8 @@ def export_images(
                     continue
 
                 im_obj = handle_dimensions(im_obj, im_name, log_file)
+
+                noisy_copy = np.asarray(deepcopy(im_obj))
 
                 if generator:
                     try:
@@ -329,16 +372,30 @@ def export_images(
                 else:
                     img_arr = np.asarray(im_obj)
 
-                # a workaroud so wand's mip map generation doesn't eliminate RGB information on the mipmaps where alpha = 0 on the original full scale layer
-                # adding a 1 to the pixel value seems incosequential for the opacity and RGB channels
-
+                # the follwing is a workaroud so wand's mip map generation doesn't eliminate RGB information on the mipmaps where alpha = 0 on the original
+                # full scale layer adding a 1 to the pixel value seems incosequential for Alpha and RGB channels
                 if export_config["mipmaps"] != "none":
                     img_arr = np.copy(img_arr)
                     img_arr[np.where(img_arr == 0)] += 1
 
+                # handle denoise level
+                try:
+                    img_arr = handle_noise(
+                        noisy_image=noisy_copy,
+                        denoised_image=img_arr,
+                        scale=scale,
+                        noise_factor=export_config['noise_level'],
+                    )
+                except:
+                    pass  # this is undefined variable error
+
                 with wand_image.from_array(img_arr) as img:
                     img.format = export_config["format"]
-                    img.compression = export_config["compression"] if not export_config["compression"] == "none" else "no"
+                    img.compression = (
+                        export_config["compression"]
+                        if not export_config["compression"] == "none"
+                        else "no"
+                    )
                     handle_mipmaps(export_config, img)
                     im_name = handle_naming(export_config, im_name, i)
 
@@ -352,7 +409,6 @@ def export_images(
                     write_log_to_file(
                         "INFO", f"Saved {im_name} to {save_path}", log_file
                     )
-                    # print(f"saved current {im_name} to {save_path}")
                     if not master and verbose:
                         print(f"\n[INFO] Saved {im_name} to {save_path}\n")
                 if master:

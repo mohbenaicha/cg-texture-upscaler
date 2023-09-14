@@ -13,6 +13,7 @@ device = " The device to use for upscaling  \n  the selected texture(s). CPU ups
 scale = " Scale the width and heigth of the  \n  texture(s) by the chosen scale.  \n  I.e. a texture with a resolution of [512x256]  \n  with a scale of 2x because a [1024x1024]  \n  resolution image  "
 format = " Engine-supported texture format  "
 compression = "  PNG: None \n TGA: RLE \n DDS: DXT-1 (no alpha), DXT-3 (supports alpha), DXT-5 (produces a quality alpha than DXT-5)  "
+denoise = " Level of noise to add. Noise is added from the original  \n  image, not from an AI model. The more noise that is  \n  added the lower the quality of the final image  \n  "
 mipmaps = "  Used for DDS compression. Ex: A 50% mip level will  \n  generate half the possible mipmaps for a texture, i.e.  \n  if a texture's resolution is 512x512 only the  \n  [256x256, 128x128, 64x64, 32x32] mip maps are generated."
 prefix = "  Add a prefix to each file name:  \n    [prefix]filename.extension  "
 suffix = "  Add a suffix to each file name:  \n    filename[suffix].extension  "

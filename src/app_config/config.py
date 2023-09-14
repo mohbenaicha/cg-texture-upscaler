@@ -78,7 +78,7 @@ class ExportConfig:
     save_in_existing_location: bool = False
     # TODO: implement
     weight_file: Union[str, None] = "saved_models"
-    # denoise_factor: Union[float, None] = None
+    noise_level: float = 0.5
     # sharpness_factor: Union[float, None] = None
 
 
@@ -96,7 +96,7 @@ class GUITheme(Enum):
 
 class GUIConfig:
     master_default_width: int = 690
-    master_default_height: int = 1000
+    master_default_height: int = 1050
     main_listbox_height: int = 38
     main_listbox_width: int = 60
     labels_fontsize: int = 16

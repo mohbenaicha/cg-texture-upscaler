@@ -125,6 +125,7 @@ class SaveConfigWindow(ctk.CTkToplevel):
             "single_export_loc": ExportConfig.single_export_location
             if not ExportConfig.single_export_location == None
             else "",
+            "noise_level": ExportConfig.noise_level
         }
         if not os.path.exists("user_config"):
             os.mkdir("user_config")
@@ -304,6 +305,9 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.exp_opts_frame.compression_subframe.menu.set(
             value=self.parsed_conf["compression"]
         )
+
+        self.exp_opts_frame.set_noise(self.parsed_conf["noise_level"])
+        self.exp_opts_frame.denoise_subframe.slider.set(self.parsed_conf["noise_level"])
 
         self.exp_opts_frame.additional_options_subframe.menu.set(
             value=self.parsed_conf["mipmaps"]

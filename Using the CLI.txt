@@ -20,6 +20,8 @@ The arguments that the CLI accepts include:
 
 --compression: the compression algorithm for the image format you are processing, can take values: {dxt1,dxt3,dxt5,jpeg,losslessjpeg,piz,pxr24,rle,undefined,zip,zips} (ex: --compression dxt5)
 
+--noise_level: the amount of noise to add. Note: noise added is not from an AI model but rather traditional upscaling algorithm. As more noise is added the AI-upscaled image's quality is reduced. Supported values: float values from 0.0 to 1.0.
+
 --mipmaps: for Direct Draw Surface image formats, can take values: {max,75%,50%,25%,none} (ex: -mipmaps 50%)
 
 --prefix: a prefix string to add to the saved file name(s) that does not include any of the following illegal characters *:?<>"|/\\   (ex: --prefix dxt5_50_mips)
@@ -35,3 +37,4 @@ The arguments that the CLI accepts include:
 --source_location: the folder(s) containing the image file(s) you wish to process; this argument should be put in between single quotes, supports values {single path location} (ex: --source_location 'c:\users\johndoe\my_images')
 
 --export_location: the target folder to which to export the processed image file(s), supports values {original_location, single path location}. This argument should be put in between single quotes. If  the 'original_location' is passed as the argument, the images are saved in the place where they currently exist, if no id, prefix or suffix values are give, and if the export image format is the same as the original image format, the image file will be overwritten(ex: --export_location 'c:\users\johndoe\upscaled_images' | --export_location 'original_location')
+

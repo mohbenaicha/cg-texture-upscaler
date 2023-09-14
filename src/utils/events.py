@@ -98,26 +98,44 @@ def recursive_checkbox_event(
 def print_to_frame(
     frame: ctk.CTkFrame, string: str, grid: bool, destroy: bool, **kwargs
 ):
-    frame.error_label.configure(text="")
+    try:
+        frame = frame.error_label
+        frame.configure(text="")
+    except:
+        frame = frame.label
+        frame.configure(text="")
+
     if not destroy:
-        frame.error_label = ctk.CTkLabel(
-            master=frame,
-            text=string,
-            font=kwargs.get("font"),
-            text_color=kwargs.get("text_color"),
-            width=kwargs.get("lbl_width"),
-            height=kwargs.get("lbl_height"),
-        )
-        if grid:
-            frame.error_label.grid(
-                row=kwargs.get("row"),
-                column=kwargs.get("column"),
-                columnspan=kwargs.get("columnspan"),
-                padx=kwargs.get("padx"),
-                pady=kwargs.get("pady"),
-            )
-        else:
-            frame.error_label.pack(side=kwargs.get("side"))
+        frame.configure(text=string)
+        # frame = ctk.CTkLabel(
+        #     master=frame.master,
+        #     text=string,
+        #     font=kwargs.get("font"),
+        #     text_color=kwargs.get("text_color"),
+        #     width=kwargs.get("lbl_width"),
+        #     height=kwargs.get("lbl_height"),
+        # )
+        # if grid:
+        #     frame.grid(
+        #         row=kwargs.get("row"),
+        #         column=kwargs.get("column"),
+        #         columnspan=kwargs.get("columnspan"),
+        #         padx=kwargs.get("padx"),
+        #         pady=kwargs.get("pady"),
+        #     )
+        # else:
+        #     frame.pack(side=kwargs.get("side"))
+    # else:
+    #     if grid:
+    #         frame.grid(
+    #             row=kwargs.get("row"),
+    #             column=kwargs.get("column"),
+    #             columnspan=kwargs.get("columnspan"),
+    #             padx=kwargs.get("padx"),
+    #             pady=kwargs.get("pady"),
+    #         )
+    #     else:
+    #         frame.pack(side=kwargs.get("side"))
 
 
 def handle_following_menus(

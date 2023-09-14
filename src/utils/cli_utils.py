@@ -24,6 +24,15 @@ parser.add_argument(
     required=True,
     help="The desired export scale. Set to none if no upscaling is needed.",
 )
+
+parser.add_argument(
+    "--noise_level",
+    type=float,
+    default=0.5,
+    required=False,
+    help="The desired level of noise you wish to add on top of the AI-upscaled texture. The value has to be a float value from 0 to 1.",
+)
+
 parser.add_argument(
     "--export_format",
     type=str,
@@ -113,7 +122,7 @@ parser.add_argument(
 )
 
 
-def clean_args(args):
+def parse_args(args):
     ''' Handles user's command line arguments.'''
     # 0. Setup log file and args object
     log_file = write_log_to_file(None, None, None)
@@ -198,5 +207,6 @@ def clean_args(args):
         else "",
         "verbose": args.verbose,
         "custom_weights": None,
+        "noise_level": args.noise_level
     }
     return export_config

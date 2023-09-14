@@ -19,6 +19,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
         self.scale = ctk.StringVar(value=ExportConfig.scale)
         self.format = ctk.StringVar(value=ExportConfig.export_format)
         self.compression = ctk.StringVar(value=ExportConfig.compression)
+        self.noise = ctk.DoubleVar(value=ExportConfig.noise_level)
         self.mipmaps = ctk.StringVar(value=ExportConfig.mipmaps)
         self.prefix = ctk.StringVar(value=ExportConfig.save_prefix)
         self.suffix = ctk.StringVar(value=ExportConfig.save_suffix)
@@ -45,6 +46,9 @@ class ExportOptionsFrame(ctk.CTkFrame):
             self, fg_color="transparent", height=10, width=150
         )
         self.compression_subframe = ctk.CTkFrame(
+            self, fg_color="transparent", height=10, width=150
+        )
+        self.denoise_subframe = ctk.CTkFrame(
             self, fg_color="transparent", height=10, width=150
         )
         self.additional_options_subframe = ctk.CTkFrame(
@@ -182,6 +186,36 @@ class ExportOptionsFrame(ctk.CTkFrame):
             text_color=GUIConfig.tooltop_text_color,
         )
 
+        
+        # compression buttons
+        self.denoise_subframe.label = ctk.CTkLabel(
+            self.denoise_subframe,
+            font=fonts.options_font(),
+            text=f"Noise {round(ExportConfig.noise_level,1)}",
+            height=20,
+            width=50,
+        )
+        self.denoise_subframe.slider = ctk.CTkSlider(
+            master=self.denoise_subframe,
+            from_=0.,
+            to=1.,
+            number_of_steps=10,
+            command=self.set_noise,
+            variable=self.noise,
+            height=20,
+            width=100,
+        )
+        self.set_noise(ExportConfig.noise_level)
+        
+        # self.denoise_subframe.menu.set(value=ExportConfig.compression)
+        self.denoise_subframe.menu_tt = Hovertip_Frame(
+            anchor_widget=self.denoise_subframe.label,
+            text=ttt.denoise,
+            hover_delay=GUIConfig.tooltip_hover_delay,
+            bg_color=GUIConfig.tooltip_color,
+            text_color=GUIConfig.tooltop_text_color,
+        )
+
         # additional options - mipmaps entry field
         self.additional_options_subframe.label = ctk.CTkLabel(
             master=self.additional_options_subframe,
@@ -300,6 +334,21 @@ class ExportOptionsFrame(ctk.CTkFrame):
     def set_compression(self, value):
         ExportConfig.compression = value
 
+    def set_noise(self, value):
+        print_to_frame(
+            self.denoise_subframe,
+            grid=False,#True,
+            side=LEFT,
+            string=f"Noise ({round(value, 1)})",
+            destroy=False,
+            font=fonts.labels_font(),
+            text_color="white",
+            lbl_height=15,
+            lbl_width=50,
+        )
+        ExportConfig.noise_level = value
+        
+
     def set_mipmaps(self, value):
         ExportConfig.mipmaps = value
 
@@ -350,14 +399,15 @@ class ExportOptionsFrame(ctk.CTkFrame):
         self.scale_subframe.grid(row=2, column=0, padx=35, pady=5, sticky="new")
         self.format_subframe.grid(row=3, column=0, padx=35, pady=5, sticky="new")
         self.compression_subframe.grid(row=4, column=0, padx=35, pady=5, sticky="new")
+        self.denoise_subframe.grid(row=5, column=0, padx=35, pady=5, sticky="new")
         self.additional_options_subframe.grid(
-            row=5, column=0, padx=35, pady=5, sticky="new"
-        )
-        self.export_numbering_subframe.grid(
             row=6, column=0, padx=35, pady=5, sticky="new"
         )
-        self.export_prefix_subframe.grid(row=7, column=0, padx=35, pady=5, sticky="new")
-        self.export_suffix_subframe.grid(row=8, column=0, padx=35, pady=9, sticky="new")
+        self.export_numbering_subframe.grid(
+            row=7, column=0, padx=35, pady=5, sticky="new"
+        )
+        self.export_prefix_subframe.grid(row=8, column=0, padx=35, pady=5, sticky="new")
+        self.export_suffix_subframe.grid(row=9, column=0, padx=35, pady=9, sticky="new")
 
         # plot subframe elements
         self.options_label_frame.label.grid(row=0, column=0, padx=20, sticky="ew")
@@ -377,6 +427,10 @@ class ExportOptionsFrame(ctk.CTkFrame):
         # compression dropdown
         self.compression_subframe.label.pack(side=LEFT)
         self.compression_subframe.menu.pack(side=RIGHT)
+
+        # denoise slider
+        self.denoise_subframe.label.pack(side=LEFT)
+        self.denoise_subframe.slider.pack(side=RIGHT)
 
         # additional options - mipmaps options menu
         self.additional_options_subframe.label.pack(side=LEFT)

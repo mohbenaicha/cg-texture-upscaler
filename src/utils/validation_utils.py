@@ -53,6 +53,7 @@ class ExportConfigSchema(BaseModel):
     save_in_existing_location: Optional[bool]  
     single_export_location: Optional[str]
     weight_file: Optional[str]
+    noise_level: Optional[float]
 
 
 class GeneratorArgumentSchema(BaseModel):

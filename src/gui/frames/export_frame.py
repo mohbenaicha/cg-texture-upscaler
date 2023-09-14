@@ -192,6 +192,7 @@ class ExportFrame(ctk.CTkFrame):
         valid_config, error = validate_export_config(export_config=config_cls)
         
         if error:
+            print(error)
             return False
         else:
             return {
@@ -205,7 +206,8 @@ class ExportFrame(ctk.CTkFrame):
                 "numbering": valid_config.get("save_numbering", None),
                 "export_to_original": valid_config.get("save_in_existing_location", None),
                 "single_export_location": valid_config.get("single_export_location", None),
-                "weight_file": ExportConfig.weight_file,
+                "weight_file": valid_config.get("weight_file", None),
+                "noise_level": valid_config.get("noise_level", None),
             }
 
     def set_export_type(self):
