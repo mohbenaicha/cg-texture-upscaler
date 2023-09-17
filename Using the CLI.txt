@@ -3,7 +3,7 @@ Using the CLI
 The cli can be accessed by executing CGTextureUpscaler.exe through a terminal, and passing in the supported arguments:
 
 
-CGTextureUpscaler.exe --source_location 'c:\Users\johndoe\Desktop\my_images' --noise_level 0.25 --export_location 'original_location' -r --device cuda --scale 2x --export_format bmp --compression rle --and_filters tga --or_filters nrm bc metallic mask -v -id --prefix rle --suffix 2x 
+CGTextureUpscaler.exe --source_location 'c:\Users\johndoe\Desktop\my_images' --noise_level 0.25 --export_location 'original_location' -r --device cuda --scale 2x --export_format tga --compression rle --and_filters tga --or_filters nrm bc metallic mask -v -id --prefix rle --suffix 2x 
 
 
 The arguments that the CLI accepts include:
@@ -44,6 +44,6 @@ The arguments that the CLI accepts include:
     "bmp": "none",     -- unfortunately, the image reading and writing library used doesn't support rle compression for bmp
     "jpg": "none", "jpeg", "losslessjpeg"
     "exr": "none", "pxr24", "rle", "piz", "zip", "zips"
-    "png": "none",     -- note, but default PNG image information is lossless hence why no compression is supported
+    "png": "none",     -- note, by default PNG image information is lossless hence why no compression is supported
    
-**Only supported by the DDS format type
+** The CG Texture Upscaler only exports mip maps for DDS images

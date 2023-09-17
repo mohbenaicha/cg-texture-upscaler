@@ -15,5 +15,5 @@ upscaler.ico
 */__pycache__/
 src/tests/test_data/export_test_data/
 src/tests/test_data/model_test_data/
-CGTextureUpscaler(CPU).rar
-CGTextureUpscaler(GPU+CPU).rar
+src/CGTextureUpscaler_v0.4.0(CPU).rar
+src/CGTextureUpscaler_v0.4.0(CPU+GPU).rar

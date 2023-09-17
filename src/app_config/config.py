@@ -94,7 +94,7 @@ class GUITheme(Enum):
 
 
 class GUIConfig:
-    master_default_width: int = 710
+    master_default_width: int = 690
     master_default_height: int = 1050
     main_listbox_height: int = 38
     main_listbox_width: int = 60
