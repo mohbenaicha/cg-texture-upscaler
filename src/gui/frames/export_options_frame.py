@@ -186,7 +186,6 @@ class ExportOptionsFrame(ctk.CTkFrame):
             text_color=GUIConfig.tooltop_text_color,
         )
 
-        
         # compression buttons
         self.denoise_subframe.label = ctk.CTkLabel(
             self.denoise_subframe,
@@ -197,8 +196,8 @@ class ExportOptionsFrame(ctk.CTkFrame):
         )
         self.denoise_subframe.slider = ctk.CTkSlider(
             master=self.denoise_subframe,
-            from_=0.,
-            to=1.,
+            from_=0.0,
+            to=1.0,
             number_of_steps=10,
             command=self.set_noise,
             variable=self.noise,
@@ -206,7 +205,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             width=100,
         )
         self.set_noise(ExportConfig.noise_level)
-        
+
         # self.denoise_subframe.menu.set(value=ExportConfig.compression)
         self.denoise_subframe.menu_tt = Hovertip_Frame(
             anchor_widget=self.denoise_subframe.label,
@@ -337,17 +336,16 @@ class ExportOptionsFrame(ctk.CTkFrame):
     def set_noise(self, value):
         print_to_frame(
             self.denoise_subframe,
-            grid=False,#True,
+            grid=False,
             side=LEFT,
             string=f"Noise ({round(value, 1)})",
-            destroy=False,
+            error=False,
             font=fonts.labels_font(),
             text_color="white",
             lbl_height=15,
             lbl_width=50,
         )
         ExportConfig.noise_level = value
-        
 
     def set_mipmaps(self, value):
         ExportConfig.mipmaps = value

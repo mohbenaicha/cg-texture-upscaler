@@ -133,7 +133,7 @@ class SearchFilterFrame(ctk.CTkFrame):
             height=10,
         )
         self.error_printout_frame.error_label = ctk.CTkLabel(
-            master=self.button_sub_frame,
+            master=self.error_printout_frame,
             text=" ",
             text_color="red",
             width=50,
@@ -167,7 +167,7 @@ class SearchFilterFrame(ctk.CTkFrame):
                     obj.error_printout_frame,
                     grid=True,
                     string=f"*Illegal character(s):   " + " , ".join(bad_chars_found),
-                    destroy=False,
+                    error=True,
                     font=fonts.error_font(),
                     text_color="red",
                     lbl_height=15,
@@ -186,7 +186,6 @@ class SearchFilterFrame(ctk.CTkFrame):
                     f"*Illegal character(s) found in filters:   "
                     + " , ".join(bad_chars_found)
                 )
-
                 sys.exit(1)
         else:
             # if no illegal characters are found the AND and OR fields are checked against the chosen directory
@@ -194,8 +193,8 @@ class SearchFilterFrame(ctk.CTkFrame):
                 print_to_frame(
                     obj.error_printout_frame,
                     grid=True,
-                    string="",
-                    destroy=False,
+                    string="\t"*5,
+                    error=True,
                     font=fonts.error_font(),
                     text_color="red",
                     lbl_height=15,

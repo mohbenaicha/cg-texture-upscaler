@@ -1,3 +1,4 @@
+import os
 from typing import Union
 import customtkinter as ctk
 from PIL import Image as pil_image
@@ -190,9 +191,7 @@ class ExportFrame(ctk.CTkFrame):
     @classmethod
     def parse_export_config(cls, config_cls):
         valid_config, error = validate_export_config(export_config=config_cls)
-        
-        if error:
-            print(error)
+        if error:    
             return False
         else:
             return {
@@ -228,6 +227,7 @@ class ExportFrame(ctk.CTkFrame):
         exp_ids = self.lb_frame.curselection()
         if len(exp_ids) > 0:
             export_config = ExportFrame.parse_export_config(ExportConfig)
+
             if not export_config:
                 write_log_to_file("Error", "Could not validate export config.", log_file)
                 CTkMessagebox(

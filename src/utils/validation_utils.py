@@ -1,12 +1,11 @@
-import sys
-
-sys.path.append("C:\\Users\\Moham\\Desktop\\official_cg_tool_dev_repo\\src")
-
+import os
 import inspect
-from typing import List, Optional, Tuple, Union
+from typing import List, Optional, Tuple
 from pydantic import BaseModel, ValidationError
 from app_config.config import ExportConfig
+from model.utils import write_log_to_file
 
+log_file = write_log_to_file(None, None, None)
 
 def validate_export_config(
     *,
@@ -19,10 +18,15 @@ def validate_export_config(
     config_obj = dict()
     for member in list(inspect.get_annotations(export_config)):
         config_obj[member] = export_config.__dict__.get(member, None)
+    
+    if not os.path.isdir(config_obj['single_export_location']) and not config_obj['save_in_existing_location']:
+        errors = f"Invalid export path: {config_obj['single_export_location']}"
+        write_log_to_file("Error", errors, log_file)
     try:
         ExportConfigSchema(**config_obj)
     except ValidationError as error:
         errors = error.json()
+        write_log_to_file("Error", f"Invalid export configuration: {config_obj}", log_file)
     return config_obj, errors
 
 

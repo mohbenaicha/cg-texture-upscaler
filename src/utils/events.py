@@ -19,6 +19,7 @@ def select_fof_event(
     update_config: bool = True,
 ):
     from gui.frames.main_listbox_frame import TkListbox
+
     selection, no_selection = archiveBrowse(
         master_frame, fof, root_dir, export, update_config
     )
@@ -37,7 +38,10 @@ def select_fof_event(
             else:
                 enable_UI_elements(master_frame.recursive_checkbox)
                 TkListbox.populate(
-                    lb_frame, master_frame.selected_fof.get(), SearchConfig.recursive, add=False
+                    lb_frame,
+                    master_frame.selected_fof.get(),
+                    SearchConfig.recursive,
+                    add=False,
                 )
             SearchConfig.lb_populated_once = True
 
@@ -95,51 +99,40 @@ def recursive_checkbox_event(
     lb_frame.populate(parent_dir.get(), recursive.get(), add=False)
 
 
-def print_to_frame(
-    frame: ctk.CTkFrame, string: str, grid: bool, destroy: bool, **kwargs
-):
+def print_to_frame(frame: ctk.CTkFrame, string: str, grid: bool, error: bool, **kwargs):
     try:
         frame = frame.error_label
-        frame.configure(text="")
+        frame.configure(text="\t")
     except:
         frame = frame.label
         frame.configure(text="")
 
-    if not destroy:
+    if error:
+        # frame.configure(text=string)
+        frame = ctk.CTkLabel(
+            master=frame.master,
+            text=string,
+            font=kwargs.get("font"),
+            text_color=kwargs.get("text_color"),
+            width=kwargs.get("lbl_width"),
+            height=kwargs.get("lbl_height"),
+        )
+        if grid:
+            frame.grid(
+                row=kwargs.get("row"),
+                column=kwargs.get("column"),
+                columnspan=kwargs.get("columnspan"),
+                padx=kwargs.get("padx"),
+                pady=kwargs.get("pady"),
+            )
+        else:
+            frame.pack(side=kwargs.get("side"))
+    else:
         frame.configure(text=string)
-        # frame = ctk.CTkLabel(
-        #     master=frame.master,
-        #     text=string,
-        #     font=kwargs.get("font"),
-        #     text_color=kwargs.get("text_color"),
-        #     width=kwargs.get("lbl_width"),
-        #     height=kwargs.get("lbl_height"),
-        # )
-        # if grid:
-        #     frame.grid(
-        #         row=kwargs.get("row"),
-        #         column=kwargs.get("column"),
-        #         columnspan=kwargs.get("columnspan"),
-        #         padx=kwargs.get("padx"),
-        #         pady=kwargs.get("pady"),
-        #     )
-        # else:
-        #     frame.pack(side=kwargs.get("side"))
-    # else:
-    #     if grid:
-    #         frame.grid(
-    #             row=kwargs.get("row"),
-    #             column=kwargs.get("column"),
-    #             columnspan=kwargs.get("columnspan"),
-    #             padx=kwargs.get("padx"),
-    #             pady=kwargs.get("pady"),
-    #         )
-    #     else:
-    #         frame.pack(side=kwargs.get("side"))
 
 
 def handle_following_menus(
-    master_frame:  Union[ctk.CTkOptionMenu, None] = None, format: str = "dds"
+    master_frame: Union[ctk.CTkOptionMenu, None] = None, format: str = "dds"
 ):
     ExportConfig.active_compression = ppconfig.compression_map[format]
     master_frame.compression_subframe.menu.configure(
@@ -153,7 +146,7 @@ def handle_following_menus(
 
 
 def disable_UI_elements(
-    element:  Union[ctk.CTkCheckBox, ctk.CTkEntry, ctk.CTkOptionMenu, None] = None,
+    element: Union[ctk.CTkCheckBox, ctk.CTkEntry, ctk.CTkOptionMenu, None] = None,
 ):
     # disable recursive checkbox
     element.configure(state="disabled")
@@ -166,6 +159,6 @@ def disable_UI_elements(
 
 
 def enable_UI_elements(
-    element:  Union[ctk.CTkCheckBox, ctk.CTkEntry, ctk.CTkOptionMenu, None] = None,
+    element: Union[ctk.CTkCheckBox, ctk.CTkEntry, ctk.CTkOptionMenu, None] = None,
 ):
     element.configure(state="normal")

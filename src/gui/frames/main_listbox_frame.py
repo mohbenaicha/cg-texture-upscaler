@@ -428,7 +428,7 @@ class TkListbox(ctk.CTkFrame):
                 lbl_width=50,
                 lbl_height=15,
                 string="",
-                destroy=True,
+                error=True,
                 columnspan=4,
             )
             TkListbox.populate(
@@ -442,7 +442,7 @@ class TkListbox(ctk.CTkFrame):
                 frame=self.button_frame,
                 grid=True,
                 string="No file or directory selected",
-                destroy=False,
+                error=False,
                 font=error_font(),
                 text_color="red",
                 lbl_width=50,

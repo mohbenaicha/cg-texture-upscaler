@@ -3,7 +3,6 @@ import torch
 from enum import Enum
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
-from pydantic import BaseModel, validator
 
 
 class PrePostProcessingConfig:
@@ -22,7 +21,7 @@ class PrePostProcessingConfig:
     compression_map: Dict[str, Tuple] = {
         "dds": tuple(("none", "dxt1", "dxt3", "dxt5")),
         "tga": tuple(("none", "rle")),
-        "bmp": tuple(("none")),
+        "bmp": tuple(("none",)),
         "jpg": tuple(("none", "jpeg", "losslessjpeg")),
         "exr": tuple(("none", "pxr24", "rle", "piz", "zip", "zips")),
         "png": tuple(("none",)),
@@ -95,7 +94,7 @@ class GUITheme(Enum):
 
 
 class GUIConfig:
-    master_default_width: int = 690
+    master_default_width: int = 710
     master_default_height: int = 1050
     main_listbox_height: int = 38
     main_listbox_width: int = 60
@@ -121,3 +120,8 @@ class GUIConfig:
     rel_log_path: str = "./logs/"
 
 
+class TechConfig:
+    gui_version: str = "0.0.3"
+    cli_version: str = "0.0.2"
+    app_display_name: str = "CG Texture Upscaler"
+    app_cli_name: str = "CG Texture Upscaler CLI"

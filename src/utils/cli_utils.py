@@ -1,28 +1,37 @@
 import os, sys
 from gui.frames import SearchFilterFrame, TkListbox
-from app_config.config import PrePostProcessingConfig as ppconf
-from app_config.config import ExportConfig as expconf
-from app_config.config import SearchConfig as serconf
+from app_config.config import (
+    PrePostProcessingConfig as ppconf,
+    ExportConfig as expconf,
+    SearchConfig as serconf,
+    TechConfig as tconf,
+)
 from caches.cache import image_paths_cache
 from model import write_log_to_file
 import argparse
 
-parser = argparse.ArgumentParser()
+
+parser = argparse.ArgumentParser(
+    prog=f"{tconf.app_cli_name} {tconf.cli_version}",
+    usage="Please refer to the 'Using the CLI' text file for guidance on using this tool.",
+)
+
 parser.add_argument(
     "--device",
     type=str,
     choices=expconf.available_devices,
     default=expconf.available_devices[0],
     required=True,
-    help="The device to use if upscaling. Defaults to CPU.",
+    help="The device to use for processing. Defaults to CPU. For GPU, use the argument cuda. i.e. --device cuda ",
 )
+
 parser.add_argument(
     "--scale",
     type=str,
     choices=ppconf.available_scales,
     default=ppconf.available_scales[0],
     required=True,
-    help="The desired export scale. Set to none if no upscaling is needed.",
+    help="The desired export scale. Set to none if no upscaling is needed. i.e. --scale 2x ",
 )
 
 parser.add_argument(
@@ -30,7 +39,7 @@ parser.add_argument(
     type=float,
     default=0.5,
     required=False,
-    help="The desired level of noise you wish to add on top of the AI-upscaled texture. The value has to be a float value from 0 to 1.",
+    help="The desired level of noise you wish to add on top of the AI-upscaled texture. The value has to be a float value from 0 to 1. i.e. --noise_level 0.25",
 )
 
 parser.add_argument(
@@ -39,7 +48,7 @@ parser.add_argument(
     choices=ppconf.available_export_formats,
     required=True,
     default=ppconf.available_export_formats[0],
-    help="The desired export file format.",
+    help="The desired export file format. i.e. --export_format png ",
 )
 
 compression_formats = []
@@ -52,83 +61,90 @@ parser.add_argument(
     default=[
         "",
     ],
-    help="Process files with all of the character sequences specified.",
+    help="Process files with all of the character sequences specified. Space-separated strings. i.e. --and_filters albedo png ",
 )
+
 parser.add_argument(
     "--or_filters",
     nargs="*",
     default=[
         "",
     ],
-    help="Process files with any of the character sequences specified.",
+    help="Process files with any of the character sequences specified. Space-separated strings. i.e. --or_filters albedo door wall roof ",
 )
+
 parser.add_argument(
     "--compression",
     type=str,
     choices=sorted(set(compression_formats)),
     default=compression_formats[0],
-    help="The compression format if it is supported for the respective image format. Refer to the cli guide for more information.",
+    help="The compression format if it is supported for the respective image format. Refer to 'Using the CLI' for more information.",
 )
+
 parser.add_argument(
     "--mipmaps",
     type=str,
     choices=ppconf.mipmap_levels,
     default=ppconf.mipmap_levels[0],
-    help="The percentage of mip level you wish to include",
+    help="The percentage of mip levels you wish to include. i.e. --mipmaps 75%% ",
 )
+
 parser.add_argument(
     "--unique_id",
     "-id",
     action="store_true",
-    help="Give eah file a unique ID to avoid files overwriting others with the same name.",
+    help="Give each file a unique ID to avoid files overwriting others with the same name when exporting to a single location. i.e. -id",
 )
+
 parser.add_argument(
     "--prefix",
     type=str,
     default="",
-    help="The prefix to append to the export file name",
+    help="The prefix to append to the export file name. i.e. --prefix cgtu_test ",
 )
+
 parser.add_argument(
     "--suffix",
     type=str,
     default="",
-    help="The suffix to append to the export file name before the extension",
+    help="The suffix to append to the exported file name before the extension, i.e. --suffix 2x_upscale ",
 )
+
 parser.add_argument(
     "--source_location",
     type=str,
     required=True,
-    help="Full path to the export location if it's a single location or use 'single_location' to export to a single location",
+    help="Full path to the source location of images to process wrapped in quotes. i.e. 'C:\\Users\\johndoe\\Deskop\\source_images' ",
 )
+
 parser.add_argument(
     "--recursive",
     "-r",
     action="store_true",
-    help="Process the chosen folder and all subfolders.",
-)
-
-parser.add_argument(
-    "--verbose",
-    "-v",
-    action="store_true",
-    help="Print log information to console (does not affect logging to file)",
+    help="Process the chosen source folder and all subfolders.",
 )
 
 parser.add_argument(
     "--export_location",
     type=str,
     default="original_location",
-    help="Full path to the export location if it's a single location or use 'original_location' to export images to their original locations",
+    help="Full path to the export location if it's a single location wrapped in quotes or use 'original_location' to export to a single location. i.e. 'C:\\Users\\johndoe\\Deskop\\results' | i.e. --export_location original_location ",
+)
+
+parser.add_argument(
+    "--verbose",
+    "-v",
+    action="store_true",
+    help="Print log information to console (does not affect logging to file since that's done by default)",
 )
 
 
-def parse_args(args):
-    ''' Handles user's command line arguments.'''
+def parse_args(args: argparse.ArgumentParser):
+    """Handles user's command line arguments."""
     # 0. Setup log file and args object
     log_file = write_log_to_file(None, None, None)
     parser.parse_args()
 
-    
     # 1. Clean args
 
     # ensure source/target locations are valid
@@ -156,12 +172,12 @@ def parse_args(args):
         if char in args.prefix or char in args.suffix:
             write_log_to_file(
                 "Error",
-                f"Found an illegal character(s) in the prefix or suffix. Ensure you don't have a any of these characters in your prefix or suffix \n"
+                f"Found an illegal character(s) in the prefix or suffix. Ensure that you don't have a any of these characters in your prefix or suffix \n"
                 f"{serconf.illegal_search_characters}",
                 log_file,
             )
             print(
-                f"[ERROR] Found an illegal character(s) in the prefix or suffix. Ensure you don't have a any of these characters in your prefix or suffix \n"
+                f"[ERROR] Found an illegal character(s) in the prefix or suffix. Ensure that you don't have any of these characters in your prefix or suffix \n"
                 f"{serconf.illegal_search_characters}",
             )
             sys.exit(1)
@@ -207,6 +223,6 @@ def parse_args(args):
         else "",
         "verbose": args.verbose,
         "custom_weights": None,
-        "noise_level": args.noise_level
+        "noise_level": args.noise_level,
     }
     return export_config

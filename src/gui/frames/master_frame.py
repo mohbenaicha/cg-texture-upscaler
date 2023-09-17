@@ -1,7 +1,7 @@
 from tkinter import EXTENDED
 import sys
 import customtkinter as ctk
-from app_config.config import SearchConfig, GUIConfig
+from app_config.config import SearchConfig, GUIConfig, TechConfig
 from gui.frames.search_filter_frame import SearchFilterFrame
 from gui.frames.export_options_frame import ExportOptionsFrame
 from gui.frames.app_and_ui_opts_frame import AppAndUIOptions
@@ -14,7 +14,7 @@ from utils.events import select_fof_event
 class MasterFrame(ctk.CTk):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.title(kwargs.get("title", "TextureSuperRez"))
+        self.title(kwargs.get("title", f"{TechConfig.app_display_name} {TechConfig.gui_version}"))
         self.wm_attributes("-alpha", 0.99)
         self.w = kwargs.get("width", GUIConfig.master_default_width)
         self.h = kwargs.get("width", GUIConfig.master_default_height)

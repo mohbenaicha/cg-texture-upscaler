@@ -1,3 +1,4 @@
+from io import TextIOWrapper
 import os
 import shutil
 from typing import List, Dict, Union, Any
@@ -23,7 +24,7 @@ from PIL import ImageFile
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
-def pad_reflect(image, pad_size):
+def pad_reflect(image: torch.Tensor, pad_size: int):
     imsize = image.shape
     height, width = imsize[:2]
     new_img = np.zeros([height + pad_size * 2, width + pad_size * 2, imsize[2]]).astype(
@@ -47,7 +48,7 @@ def pad_reflect(image, pad_size):
     return new_img
 
 
-def unpad_image(image, pad_size):
+def unpad_image(image: torch.Tensor, pad_size: int):
     return image[pad_size:-pad_size, pad_size:-pad_size, :]
 
 
@@ -60,7 +61,7 @@ def load_model(device, scale, load: bool = True):
     return model.gen
 
 
-def write_log_to_file(log_type, message, log_file=None):
+def write_log_to_file(log_type:str , message: str, log_file: TextIOWrapper=None):
     if not log_file:
         if not os.path.exists("logs"):
             os.mkdir("logs")
@@ -85,7 +86,7 @@ def write_log_to_file(log_type, message, log_file=None):
 
 
 # TODO: implement
-def handle_alpha(rgb_img: Image, rgb_alpha, optimize, bl, br, co, file):
+def handle_alpha(rgb_img: Image, rgb_alpha, optimize:bool, bl:int, br:float, co:float, file:str):
     not_impletement = True
     if not_impletement:
         raise NotImplementedError
@@ -109,7 +110,7 @@ def handle_alpha(rgb_img: Image, rgb_alpha, optimize, bl, br, co, file):
     return rgb_img
 
 
-def calc_mipmaps(user_choice, image):
+def calc_mipmaps(user_choice:str, image:torch.Tensor):
     if user_choice == "max":
         user_choice = float(1)
     else:
@@ -118,13 +119,13 @@ def calc_mipmaps(user_choice, image):
     return str(round(user_choice * limiting_dim, 0))
 
 
-def handle_mipmaps(export_config, img):
-    if export_config["format"] == "dds":
-        if not export_config["mipmaps"] == "none":
-            num_mipmaps = calc_mipmaps(export_config["mipmaps"], img)
-            img.options["dds:mipmaps"] = num_mipmaps
-        else:
-            img.options["dds:mipmaps"] = "0"
+def handle_mipmaps(export_config:dict, img:torch.Tensor):
+    # if export_config["format"] == "dds":
+    if not export_config["mipmaps"] == "none":
+        num_mipmaps = calc_mipmaps(export_config["mipmaps"], img)
+        img.options["dds:mipmaps"] = num_mipmaps
+    else:
+        img.options["dds:mipmaps"] = "0"
 
 
 def handle_naming(export_config: dict[str, Any], im_name, index):
@@ -136,7 +137,7 @@ def handle_naming(export_config: dict[str, Any], im_name, index):
     return im_name
 
 
-def handle_dimensions(img, im_name, log_file):
+def handle_dimensions(img:torch.Tensor, im_name:str, log_file: TextIOWrapper):
     shape: List[int] = list(img.size)
     changed = False
     if shape[0] % 2 != 0:
@@ -199,7 +200,7 @@ def export_images(
     export_indices: Union[List[int], None] = None,
     prog_bar=None,
     stop_export_button=None,
-    verbose=False,
+    verbose:True=False,
     task=None,
 ):
     if export_indices == "all":
