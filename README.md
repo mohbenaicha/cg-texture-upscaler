@@ -25,6 +25,5 @@ This repo contains the source code for the official CG Texture Upscaler, a tool 
 
 *Additional notes:*
 
-1. ```cli_main.py``` code was added primarily as a placeholder
-2. The shortcut reference is available in this github repo
-3. Once tests are fully developed, they will be pushed and an official release will follow
+1. The shortcut reference is available in this github repo [currently out of date]
+2. Once tests are fully developed, they will be pushed and an official release will follow
