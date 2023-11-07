@@ -1,3 +1,5 @@
+This document isn't updated for the unstable 0.6.0 "release". For the latest set of arguments, please use the --help flag.
+
 Using the CLI
 
 The cli can be accessed by executing CGTextureUpscaler.exe through a terminal, and passing in the supported arguments:

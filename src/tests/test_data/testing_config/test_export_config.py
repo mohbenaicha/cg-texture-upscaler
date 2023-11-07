@@ -1,7 +1,7 @@
-import sys
+# import sys
 import os
 
-sys.path.append("C:\\Users\\Moham\\Desktop\\official_cg_tool_dev_repo\\src")
+# sys.path.append("C:\\Users\\Moham\\Desktop\\official_cg_tool_dev_repo\\src")
 from app_config.config import ExportConfig
 
 
