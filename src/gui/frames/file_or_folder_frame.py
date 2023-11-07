@@ -2,7 +2,7 @@ from tkinter import *
 import customtkinter as ctk
 from gui.tooltips import Hovertip_Frame
 import gui.tooltips.tooltip_text as ttt
-import utils.ctk_fonts as fonts
+import gui.ctk_fonts as fonts
 from gui.frames.main_listbox_frame import TkListbox
 from app_config.config import SearchConfig, GUIConfig
 from utils.events import *

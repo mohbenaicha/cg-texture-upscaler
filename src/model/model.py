@@ -1,5 +1,5 @@
 import torch
-from .rrdbnet_arch import Generator
+from model.arch import Generator
 
 class RESRGAN:
     def __init__(self, device, scale=4):

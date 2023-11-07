@@ -1,47 +1,48 @@
 from __future__ import annotations
-import os
-import yaml
+import os, yaml
 import tkinter as tk
 import customtkinter as ctk
-import utils.ctk_fonts as fonts
-from ..message_box import CTkMessagebox
+import gui.ctk_fonts as fonts
+from gui.message_box import CTkMessagebox
+from gui.frames import *
 from utils.events import select_fof_event
-from model.utils import copy_files
+from utils.export_utils import copy_files
 from app_config.config import *
 from caches.cache import image_paths_cache as cache_copy
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from gui.frames.export_frame import ExportFrame
-    from gui.frames.main_listbox_frame import TkListbox
-    from gui.frames.export_options_frame import ExportOptionsFrame
-    from gui.frames.file_or_folder_frame import FileOrFolderFrame
-    from gui.frames.app_and_ui_opts_frame import AppAndUIOptions
-    from gui.frames.search_filter_frame import SearchFilterFrame
 
 
 class ImageWindow(ctk.CTkToplevel):
-    def __init__(self, im_name, image, *args, **kwargs):
+    def __init__(self, *args):
         super().__init__(*args)
+        # self.setup_and_plot_image()
+        self.bind("<Escape>", self.destroy_binding)
+
+    def setup_and_plot_image(self, im_name, image, **kwargs):
         self.channels = kwargs.get("mode")
         self.width = kwargs.get("width")
         self.height = kwargs.get("height")
         self.orig_dims = kwargs.get("orig_size")
-        self.geometry(f"{self.width+10}x{self.height+80}")
-        im_file = im_name.split("\\")[-1:][0]
-
-        self.title(f"{im_file}")
-        self.image = ctk.CTkLabel(self, image=image, text="")
+        self.im_name = im_name
+        self.image = image
+        im_file = self.im_name.split("\\")[-1:][0]
+        self.title(f"Image Viewer")
+        self.image = ctk.CTkLabel(self, image=self.image, text="")
         self.txt = ctk.CTkLabel(
             self,
-            text=f"Name: {im_file}\nResolution: ({self.orig_dims[1]}x{self.orig_dims[0]})\nPreview resolution: ({self.width}x{self.height})\nChannels: {self.channels}\n{im_name}",
+            text=f"Name: {im_file}\nResolution: ({self.orig_dims[1]}x{self.orig_dims[0]})\nPreview resolution: ({self.width}x{self.height})\nChannels: {self.channels}\n{im_name}"
+            if not kwargs.get("no_preview")
+            else "\n" * 4,
             justify="left",
             width=1,
             height=1,
         )
         self.txt.grid(row=1, column=1, padx=5, pady=1, sticky="nw")
         self.image.grid(row=2, column=1, padx=5, pady=1, sticky="nw")
-        self.bind("<Escape>", self.destroy_binding)
+        self.geometry(f"{self.width+10}x{self.height+80}")
+
+    def remove_text_and_image(self):
+        self.txt.grid_forget()
+        self.image.grid_forget()
 
     def open_toplevel(self):
         if self.toplevel_window is None or not self.toplevel_window.winfo_exists():
@@ -113,9 +114,10 @@ class SaveConfigWindow(ctk.CTkToplevel):
             "recursive": SearchConfig.recursive,
             "and_filters": SearchConfig.last_and_filters,
             "or_filters": SearchConfig.last_or_filters,
+            "not_filters": SearchConfig.last_not_filters,
             "device": ExportConfig.device,
             "scale": ExportConfig.scale,
-            "format": ExportConfig.export_format,
+            "export_format": ExportConfig.export_format,
             "compression": ExportConfig.compression,
             "mipmaps": ExportConfig.mipmaps,
             "numbering": ExportConfig.save_numbering,
@@ -125,8 +127,17 @@ class SaveConfigWindow(ctk.CTkToplevel):
             "single_export_loc": ExportConfig.single_export_location
             if not ExportConfig.single_export_location == None
             else "",
-            "noise_level": ExportConfig.noise_level
+            "noise_level": ExportConfig.noise_level,
+            "browsermode_on": GUIConfig.browser_mode_on,
+            "export_color_mode": {"RGBA": "RGBA", "RGB":"RGB", "LA":"Greyscale+Alpha", "L":"Greyscale", "Indexed":"Indexed"}[ExportConfig.export_color_mode],
+            "color_space": ExportConfig.color_space,
+            "export_color_depth": ExportConfig.export_color_depth,
+            "gamma_adjustment": ExportConfig.gamma_adjustment,
+            "upscale_precision": ExportConfig.upscale_precision,
+            "split_large_image": ExportConfig.split_large_image,
+            "padding_size": ExportConfig.padding_size,
         }
+        
         if not os.path.exists("user_config"):
             os.mkdir("user_config")
         with open(os.path.join("user_config", f"{fn}.cfg"), "w") as yamlfile:
@@ -168,6 +179,7 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.fof_frame: FileOrFolderFrame = kwargs.get("fof_frame")
         self.filter_frame: SearchFilterFrame = kwargs.get("filter_frame")
         self.exp_opts_frame: ExportOptionsFrame = kwargs.get("exp_opts_frame")
+        self.addit_sett_frame: AdditionalOptionsFrame = kwargs.get("addit_sett_frame")
         self.lb_frame: TkListbox = kwargs.get("lb_frame")  # image file populate listbox
         self.export_frame: ExportFrame = kwargs.get("export_frame")
 
@@ -286,25 +298,25 @@ class LoadConfigWindow(ctk.CTkToplevel):
             entry.delete("0", ctk.END)
             entry.insert("0", self.parsed_conf["and_filters"][i])
             SearchConfig.last_and_filters[i] = self.parsed_conf["and_filters"][i]
+
         for i, entry in enumerate(self.filter_frame.or_filters):
             entry.delete("0", ctk.END)
             entry.insert("0", self.parsed_conf["or_filters"][i])
             SearchConfig.last_or_filters[i] = self.parsed_conf["or_filters"][i]
 
-    def set_export_options_frame(self):
-        self.exp_opts_frame.device_subframe.menu.set(value=self.parsed_conf["device"])
-        self.exp_opts_frame.set_device(value=self.parsed_conf["device"])
+        for i, entry in enumerate(self.filter_frame.not_filters):
+            entry.delete("0", ctk.END)
+            entry.insert("0", self.parsed_conf["not_filters"][i])
+            SearchConfig.last_not_filters[i] = self.parsed_conf["not_filters"][i]
 
+    def set_export_options_frame(self):
         self.exp_opts_frame.scale_subframe.menu.set(value=self.parsed_conf["scale"])
         self.exp_opts_frame.set_scale(value=self.parsed_conf["scale"])
 
-        self.exp_opts_frame.format_subframe.menu.set(value=self.parsed_conf["format"])
-        self.exp_opts_frame.set_format(value=self.parsed_conf["format"])
+        self.exp_opts_frame.format_subframe.menu.set(value=self.parsed_conf["export_format"])
+        self.exp_opts_frame.set_format(value=self.parsed_conf["export_format"])
 
         self.exp_opts_frame.set_compression(value=self.parsed_conf["compression"])
-        self.exp_opts_frame.compression_subframe.menu.set(
-            value=self.parsed_conf["compression"]
-        )
 
         self.exp_opts_frame.set_noise(self.parsed_conf["noise_level"])
         self.exp_opts_frame.denoise_subframe.slider.set(self.parsed_conf["noise_level"])
@@ -312,6 +324,7 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.exp_opts_frame.additional_options_subframe.menu.set(
             value=self.parsed_conf["mipmaps"]
         )
+        
         self.exp_opts_frame.set_mipmaps(value=self.parsed_conf["mipmaps"])
 
         self.exp_opts_frame.export_numbering_subframe.numbered_checkbox.select() if self.parsed_conf[
@@ -330,6 +343,47 @@ class LoadConfigWindow(ctk.CTkToplevel):
             "0", self.parsed_conf["suffix"]
         )
         self.exp_opts_frame.set_suffix(value=self.parsed_conf["suffix"])
+
+    def set_additional_settings_frame(self):
+        self.addit_sett_frame.set_browsermode(self.parsed_conf["browsermode_on"])
+        self.addit_sett_frame.image_browser_subframe.checkbox.select() if self.parsed_conf[
+            "browsermode_on"
+        ] else self.addit_sett_frame.image_browser_subframe.checkbox.deselect()
+
+        self.addit_sett_frame.set_device(self.parsed_conf["device"])
+        self.addit_sett_frame.device_subframe.menu.set(self.parsed_conf["device"])
+
+        self.addit_sett_frame.set_color_space(self.parsed_conf["color_space"])
+        self.addit_sett_frame.color_space_subframe.menu.set(
+            self.parsed_conf["color_space"]
+        )
+
+        self.addit_sett_frame.set_color_depth(self.parsed_conf["export_color_depth"])
+        self.addit_sett_frame.color_depth_subframe.menu.set(
+            self.parsed_conf["export_color_depth"]
+        )
+        self.addit_sett_frame.set_gamma_adjustment(self.parsed_conf["gamma_adjustment"])
+        self.addit_sett_frame.gamma_adjustment_subframe.slider.set(
+            self.parsed_conf["gamma_adjustment"]
+        )
+        self.addit_sett_frame.set_upscale_precision(
+            self.parsed_conf["upscale_precision"]
+        )
+        self.addit_sett_frame.upscale_precision_subframe.menu.set(
+            self.parsed_conf["upscale_precision"]
+        )
+
+        self.addit_sett_frame.set_splitlargeimages(
+            self.parsed_conf["split_large_image"]
+        )
+        self.addit_sett_frame.split_large_images_subframe.checkbox.select() if self.parsed_conf[
+            "split_large_image"
+        ] else self.addit_sett_frame.split_large_images_subframe.checkbox.deselect()
+
+        self.addit_sett_frame.set_padding_size(self.parsed_conf["padding_size"])
+        self.addit_sett_frame.padding_size_subframe.slider.set(
+            self.parsed_conf["padding_size"]
+        )
 
     def set_export_frame(self):
         self.export_frame.save_in_original_checkbox.select() if self.parsed_conf[
@@ -357,6 +411,7 @@ class LoadConfigWindow(ctk.CTkToplevel):
             self.set_filter_frame()
             self.set_export_options_frame()
             self.set_export_frame()
+            self.set_additional_settings_frame()
             self.lb_frame.remove_items(None)
 
     def cancel_button_event(self, value):

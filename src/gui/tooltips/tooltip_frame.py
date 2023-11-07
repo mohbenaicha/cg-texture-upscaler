@@ -1,8 +1,10 @@
-"""Tools for displaying tool-tips.
-
+"""
+This is an implementation of tools for displaying tool-tips.
 This includes:
  * an abstract base-class for different kinds of tooltips
  * a simple text-only Tooltip class
+
+Source: https://github.com/python/cpython/blob/main/Lib/idlelib/tooltip.py
 """
 from tkinter import *
 

@@ -4,7 +4,7 @@ from typing import List, Tuple
 
 sys.path.append("C:\\Users\\Moham\\Desktop\\official_cg_tool_dev_repo\\src")
 import pytest
-from model.utils import write_log_to_file
+from utils.export_utils import write_log_to_file
 from tests.test_data.testing_config.test_generator_config import (
     generator_constructor_args,
 )

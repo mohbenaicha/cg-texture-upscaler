@@ -2,16 +2,17 @@ import os
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image
+import cv2
 from threading import Thread
 from typing import List, Tuple, Union
 from gui.tooltips import tooltip_text as ttt
 from gui.tooltips import Hovertip_Frame
-from ..message_box import CTkMessagebox
+from gui.message_box import CTkMessagebox
 from gui.frames.top_level_frames import ImageWindow, GoToWindow, CopyFilesWindow
-from app_config.config import SearchConfig, GUIConfig
-from model.utils import write_log_to_file
+from app_config.config import SearchConfig, GUIConfig, ExportConfig
+from utils.export_utils import write_log_to_file
 from utils.events import print_to_frame
-from utils.ctk_fonts import error_font, buttons_font  # , main_lb_items_font
+from gui.ctk_fonts import error_font, buttons_font  # , main_lb_items_font
 from caches.cache import image_paths_cache as imcache
 
 
@@ -54,7 +55,9 @@ class TkListbox(ctk.CTkFrame):
             highlightthickness=0,
         )
         self.listbox_scrollbar.configure(width=25)
-
+        self.listbox.bind("<Down>", self.OnEntryDown)
+        self.listbox.bind("<Up>", self.OnEntryUp)
+        self.listbox.bind("<ButtonRelease-1>", self.handle_browser_mode)
         self.listbox.bind("<Enter>", self.enter)
         self.listbox.bind("<Leave>", self.leave)
         self.listbox.bind("<Button-3>", self.popup)  # Button-2 on Aqua
@@ -179,7 +182,7 @@ class TkListbox(ctk.CTkFrame):
             text_color=GUIConfig.tooltop_text_color,
         )
 
-        self.button_frame.error_label = ctk.CTkLabel(
+        self.button_frame.label = ctk.CTkLabel(
             master=self.button_frame, text=" ", text_color="red", height=15
         )
 
@@ -206,9 +209,7 @@ class TkListbox(ctk.CTkFrame):
         self.refresh_button.grid(column=4, row=1, padx=2, pady=2)
         self.removeselection_button.grid(column=1, row=2, columnspan=2, padx=2, pady=2)
         self.removeunselected_button.grid(column=3, row=2, columnspan=2, padx=2, pady=2)
-        self.button_frame.error_label.grid(
-            column=1, columnspan=5, row=3, padx=5, pady=4
-        )
+        self.button_frame.label.grid(column=1, columnspan=5, row=3, padx=5, pady=4)
 
     def listvariable(self, item_list):
         if item_list != None:
@@ -291,6 +292,28 @@ class TkListbox(ctk.CTkFrame):
     def deselect_all(self, value):
         self.listbox.select_clear(0, tk.END)
 
+    def OnEntryDown(self, event):
+        self.listbox.yview_scroll(1, "units")
+        self.handle_browser_mode(event)
+
+    def OnEntryUp(self, event):
+        self.listbox.yview_scroll(-1, "units")
+        self.handle_browser_mode(event)
+
+    def handle_browser_mode(self, event):
+        selection = event.widget.curselection()
+        if len(selection) == 1:
+            selection = selection[0]
+            if event.keysym == "Up":
+                selection -= 1
+            if event.keysym == "Down":
+                selection += 1
+            if 0 <= selection < event.widget.size():
+                event.widget.selection_clear(0, tk.END)
+                event.widget.select_set(selection)
+            if GUIConfig.browser_mode_on:
+                self.preview_image(event)
+
     @classmethod
     def handle_recursive_dir_walk(
         cls,
@@ -372,11 +395,17 @@ class TkListbox(ctk.CTkFrame):
 
     @classmethod
     def filter(
-        cls, obj, and_filters: List[str], or_filters: List[str], source_list: str
+        cls,
+        obj,
+        and_filters: List[str],
+        or_filters: List[str],
+        not_filters: List[str],
+        source_list: str,
     ):
         and_filters: List[str] = [filter for filter in and_filters if len(filter) > 0]
         or_filters: List[str] = [filter for filter in or_filters if len(filter) > 0]
-        len_and, len_or = len(and_filters), len(or_filters)
+        not_filters: List[str] = [filter for filter in not_filters if len(filter) > 0]
+        len_and, len_or, len_not = len(and_filters), len(or_filters), len(not_filters)
 
         if not source_list == "current_list":
             imcache[0].clear()
@@ -403,11 +432,20 @@ class TkListbox(ctk.CTkFrame):
             file = imcache[0][keep_idx]
             and_true = all([filter_txt in file for filter_txt in and_filters])
             or_true = any([filter_txt in file for filter_txt in or_filters])
+            not_true = any([filter_txt in file for filter_txt in not_filters])
+
+            ########
 
             if (
-                (and_true and not len_and == 0)
-                or (or_true and not or_true == 0)
-                or (len_and == 0 and len_or == 0)
+                (
+                    and_true and not len_and == 0 and not not_true
+                )  # and not len_not == 0)
+                or (
+                    or_true and not or_true == 0 and not not_true
+                )  # and not len_not == 0)
+                or (
+                    len_and == 0 and len_or == 0 and not not_true
+                )  # and not len_not == 0)
             ):
                 keep_idx += 1
             else:
@@ -423,7 +461,7 @@ class TkListbox(ctk.CTkFrame):
         if SearchConfig.last_used_dir_or_file:
             # using bruteforce to reread the directory
             print_to_frame(
-                frame=self.button_frame,
+                frame=self.button_frame.label,
                 grid=True,
                 lbl_width=50,
                 lbl_height=15,
@@ -439,7 +477,7 @@ class TkListbox(ctk.CTkFrame):
             )
         else:
             print_to_frame(
-                frame=self.button_frame,
+                frame=self.button_frame.label,
                 grid=True,
                 string="No file or directory selected",
                 error=False,
@@ -464,7 +502,7 @@ class TkListbox(ctk.CTkFrame):
             relief=None,
         )
         self.listbox.popup_menu.add_command(
-            label="Preview Selected (Enter)",
+            label="Preview Selected in Viewer (Enter)",
             command=lambda: self.preview_image(None),
             foreground="white",
         )
@@ -483,7 +521,6 @@ class TkListbox(ctk.CTkFrame):
             command=lambda: self.go_to_command(None),
             foreground="white",
         )
-
         self.listbox.popup_menu.add_command(
             label="Copy selected file(s) to (CTRL + C)",
             command=lambda: self.copy_selected(None),
@@ -549,60 +586,60 @@ class TkListbox(ctk.CTkFrame):
     def preview_image(self, value):
         log_file = write_log_to_file(None, None, None)
         selection = self.curselection()
-        len_selection = len(self.curselection())
-        open = False
+        len_selection = len(selection)
+        if len_selection >= 1:
+            idx = selection[0]
+        no_peview = False
+        image_to_open = os.path.join(imcache[1][idx], imcache[0][idx])
+        try:
+            if image_to_open[-3:] == "exr":
+                raw_img = Image.fromarray((cv2.cvtColor(cv2.imread(image_to_open, cv2.IMREAD_UNCHANGED), cv2.COLOR_BGRA2RGBA)*255).astype('uint8'))
+            else:
+                raw_img = Image.open(image_to_open)
+        except Exception as e:
+            write_log_to_file(
+                "Error",
+                f"Could not open {imcache[0][idx]} due to the following error: {e}. \n (path: {image_to_open})",
+                log_file,
+            )
+            no_peview = True
+            raw_img = Image.open(os.path.join("media", "no_preview.jpg"))
+            # continue
 
-        if len_selection == 1:
-            open = True
-        elif len_selection > 1:
-            if self.warn == None or not self.warn.winfo_exists():
-                self.warn = CTkMessagebox(
-                    title="Warning Message!",
-                    message=f"You are about to preview ({len(selection)}) image(s). Proceed?",
-                    icon="warning",
-                    option_1="Yes",
-                    option_2="Cancel",
-                )
-                if self.warn.get() == "Yes":
-                    open = True
-                else:
-                    pass
-        if open:
-            for idx in selection:
-                try:
-                    image_to_open = os.path.join(imcache[1][idx], imcache[0][idx])
-                    raw_img = Image.open(image_to_open)
-                except Exception as e:
-                    CTkMessagebox(
-                        title="Warning Message!",
-                        message=f"Could not open image! Please see logs.",
-                        icon="warning",
-                        option_1="Ok",
-                    )
-                    write_log_to_file(
-                        "Error",
-                        f"Could not open {imcache[0][idx]} due to the following error: {e}. \n (path: {image_to_open})",
-                        log_file,
-                    )
-                    continue
+        w, h = raw_img.size
+        im_h = max(min(h, 512), 256)
+        im_w = max(min(w, 512), 256)
+        ctk_img = ctk.CTkImage(
+            light_image=raw_img, dark_image=raw_img, size=(im_w, im_h)
+        )
+        try:
+            self.toplevel_window.remove_text_and_image()
+            self.toplevel_window.setup_and_plot_image(
+                im_name=image_to_open,
+                image=ctk_img,
+                orig_size=((h, w)),
+                width=im_w,
+                height=im_h,
+                mode=raw_img.mode,
+                no_preview=no_peview,
+            )
+        except:
+            self.toplevel_window = (
+                ImageWindow()
+            )  # create window if its None or destroyed
 
-                w, h = raw_img.size
-                im_h = max(min(h, 512), 256)
-                im_w = max(min(w, 512), 256)
-                ctk_img = ctk.CTkImage(
-                    light_image=raw_img, dark_image=raw_img, size=(im_w, im_h)
-                )
-                self.toplevel_window = ImageWindow(
-                    im_name=image_to_open,
-                    image=ctk_img,
-                    orig_size=((h, w)),
-                    width=im_w,
-                    height=im_h,
-                    mode=raw_img.mode,
-                )  # create window if its None or destroyed
+            self.toplevel_window.setup_and_plot_image(
+                im_name=image_to_open,
+                image=ctk_img,
+                orig_size=((h, w)),
+                width=im_w,
+                height=im_h,
+                mode=raw_img.mode,
+                no_preview=no_peview,
+            )
 
-                self.toplevel_window.attributes("-topmost", 1)
-                self.toplevel_window.focus()
+        self.toplevel_window.attributes("-topmost", 1)
+        # self.toplevel_window.focus()
 
     def go_to_command(self, value):
         self.toplevel_window = GoToWindow(main_lb=self)

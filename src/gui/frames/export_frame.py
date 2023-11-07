@@ -1,15 +1,14 @@
-import os
-from typing import Union
+from typing import Union, Dict
 import customtkinter as ctk
 from PIL import Image as pil_image
 import threading
-from ..message_box import CTkMessagebox
-import utils.ctk_fonts as fonts
+from gui.message_box import CTkMessagebox
+import gui.ctk_fonts as fonts
 from gui.tooltips import Hovertip_Frame
 import gui.tooltips.tooltip_text as ttt
 from gui.frames.main_listbox_frame import TkListbox
 from app_config.config import ExportConfig
-from model.utils import export_images, write_log_to_file
+from utils.export_utils import export_images, write_log_to_file
 from utils.events import (
     enable_UI_elements,
     disable_UI_elements,
@@ -33,11 +32,9 @@ class ExportFrame(ctk.CTkFrame):
         self.header_label = ctk.CTkLabel(
             self, font=fonts.header_labels_font(), width=1, text="➍ Export"
         )
-
         self.instruct_label = ctk.CTkLabel(
             self, font=fonts.labels_font(), width=1, text="Export to a single location:"
         )
-
         self.selected_export_location = ctk.StringVar(
             value=ExportConfig.single_export_location
             if ExportConfig.single_export_location != None
@@ -58,7 +55,6 @@ class ExportFrame(ctk.CTkFrame):
             textvariable=self.selected_export_location,
         )
         self.selected_fof.bind("<KeyRelease>", self.set_export_location)
-
         self.save_in_original_checkbox = ctk.CTkCheckBox(
             master=self,
             text="Save in original location",
@@ -80,7 +76,6 @@ class ExportFrame(ctk.CTkFrame):
             bg_color=GUIConfig.tooltip_color,
             text_color=GUIConfig.tooltop_text_color,
         )
-
         self.export_sub_frame = ctk.CTkFrame(
             master=self,
             fg_color="transparent",
@@ -88,7 +83,7 @@ class ExportFrame(ctk.CTkFrame):
             width=1,
             height=25,
         )  # subframe to pack select file and folder buttons
-        self.export_sub_frame.browse_button = ctk.CTkButton(
+        self.export_sub_frame.browse_button: ctk.CTkButton = ctk.CTkButton(
             self.export_sub_frame,
             text="Browse",
             font=fonts.buttons_font(),
@@ -108,7 +103,6 @@ class ExportFrame(ctk.CTkFrame):
             bg_color=GUIConfig.tooltip_color,
             text_color=GUIConfig.tooltop_text_color,
         )
-
         self.export_sub_frame.export_button = ctk.CTkButton(
             self.export_sub_frame,
             text="Export",
@@ -118,7 +112,6 @@ class ExportFrame(ctk.CTkFrame):
             text_color=GUIConfig.light_theme_color,
             command=lambda: self.export_event(None),
         )
-
         self.export_sub_frame.export_button_tt = Hovertip_Frame(
             anchor_widget=self.export_sub_frame.export_button,
             text=ttt.export,
@@ -126,7 +119,6 @@ class ExportFrame(ctk.CTkFrame):
             bg_color=GUIConfig.tooltip_color,
             text_color=GUIConfig.tooltop_text_color,
         )
-
         self.progbar_subframe = ctk.CTkFrame(
             master=self,
             width=10,
@@ -156,6 +148,29 @@ class ExportFrame(ctk.CTkFrame):
             ),
             command=lambda: self.kill_export_thread(None),
         )
+        self.export_log_subframe = ctk.CTkFrame(
+            master=self,
+            width=10,
+            height=5,
+            fg_color="transparent",
+            bg_color="transparent",
+        )
+        self.export_log_subframe.log_label: ctk.CTkLabel = ctk.CTkLabel(
+            self.export_log_subframe,
+            text="",
+            width=1,
+            height=10,
+            anchor="w",
+            font=fonts.list_font(),
+        )
+        self.export_log_subframe.count_label: ctk.CTkLabel = ctk.CTkLabel(
+            self.export_log_subframe,
+            text="",
+            width=1,
+            height=10,
+            anchor="w",
+            font=fonts.list_font(),
+        )
 
     def plot_self(self):
         self.grid(row=3, column=1, padx=5, pady=5, sticky="nesw")
@@ -168,7 +183,6 @@ class ExportFrame(ctk.CTkFrame):
         # placing entry field
         self.fof_subframe.grid(row=3, column=0, sticky="ew", padx=1, pady=5)
         self.selected_fof.grid(row=1, column=1, sticky="w", padx=6, pady=1)
-
         # placing field subframe
 
         # placing buttons and subframe for buttons
@@ -184,39 +198,88 @@ class ExportFrame(ctk.CTkFrame):
             row=1, column=0, sticky="w", padx=7, pady=10
         )
         self.progbar_subframe.grid(row=5, column=0, sticky="w", padx=7, pady=2)
+        self.export_log_subframe.grid(row=7, column=0, sticky="w", padx=5, pady=2)
+        self.export_log_subframe.log_label.grid(
+            row=1, column=0, sticky="w", padx=2, pady=2
+        )
+        self.export_log_subframe.count_label.grid(
+            row=0, column=0, sticky="w", padx=2, pady=2
+        )
+
+    def print_image_index(self, idx):
+        self.export_log_subframe.count_label.grid_forget()
+        self.export_log_subframe.count_label.configure(text=idx)
+        self.export_log_subframe.count_label.grid(
+            row=0, column=0, sticky="w", padx=2, pady=2
+        )
+
+    def print_export_logs(self, text):
+        len_, max_len = len(text), 30
+        if len_ > max_len:
+            if len(text) % max_len == 0:
+                text += " "
+
+            new_lines = len(text) // max_len
+            if new_lines:
+                temp = "...\n...".join(
+                    [
+                        text[(i) * max_len : (max_len * (i + 1)) + 1]
+                        for i in range(0, new_lines)
+                    ]
+                )
+                if text[new_lines * max_len + 1 :] != "":
+                    temp += f"...\n...{text[new_lines*max_len+1:]}"
+                text = temp
+                del temp
+        self.export_log_subframe.log_label.grid_forget()
+        self.export_log_subframe.log_label.configure(text=text)
+        self.export_log_subframe.log_label.grid(
+            row=1, column=0, columnspan=2, sticky="w", padx=2, pady=2
+        )
 
     def set_export_location(self, value):
         ExportConfig.single_export_location = self.selected_fof.get()
-    
+
     @classmethod
     def parse_export_config(cls, config_cls):
         valid_config, error = validate_export_config(export_config=config_cls)
-        if error:    
+        if error:
             return False
         else:
-            return {
+            export_config: Dict[str, Union[int, float, bool, str]] = {
                 "device": valid_config.get("device", None),
                 "scale": valid_config.get("scale", None),
-                "format": valid_config.get("export_format", None),
+                "export_format": valid_config.get("export_format", None),
                 "compression": valid_config.get("compression", None),
                 "mipmaps": valid_config.get("mipmaps", None),
                 "prefix": valid_config.get("save_prefix", None),
                 "suffix": valid_config.get("save_suffix", None),
                 "numbering": valid_config.get("save_numbering", None),
-                "export_to_original": valid_config.get("save_in_existing_location", None),
-                "single_export_location": valid_config.get("single_export_location", None),
+                "export_to_original": valid_config.get(
+                    "save_in_existing_location", None
+                ),
+                "single_export_location": valid_config.get(
+                    "single_export_location", None
+                ),
                 "weight_file": valid_config.get("weight_file", None),
                 "noise_level": valid_config.get("noise_level", None),
+                "upscale_precision": valid_config.get("upscale_precision", None),
+                "export_color_mode": valid_config.get("export_color_mode", None),
+                "color_space": valid_config.get("color_space", None),
+                "gamma_adjustment": valid_config.get("gamma_adjustment", None),
+                "export_color_depth": valid_config.get("export_color_depth", "8-bit"),
+                "split_large_image": valid_config.get("split_large_image", True),
+                "padding_size": valid_config.get("padding_size", 0.0),
             }
+            print(export_config)
+            return export_config
 
     def set_export_type(self):
         if self.export_to_original.get():
             ExportConfig.save_in_existing_location = True
-
             self.selected_fof.delete(0, ctk.END)
             disable_UI_elements(self.selected_fof)
             disable_UI_elements(self.export_sub_frame.browse_button)
-
         else:
             ExportConfig.save_in_existing_location = False
             enable_UI_elements(self.selected_fof)
@@ -229,14 +292,16 @@ class ExportFrame(ctk.CTkFrame):
             export_config = ExportFrame.parse_export_config(ExportConfig)
 
             if not export_config:
-                write_log_to_file("Error", "Could not validate export config.", log_file)
+                write_log_to_file(
+                    "Error", "Could not validate export config.", log_file
+                )
                 CTkMessagebox(
-                title="Error Message!",
-                message=f"Failed to process current configuration.",
-                icon="warning",
-                option_1="Ok",
-            )
-            
+                    title="Error Message!",
+                    message=f"Failed to process current configuration.",
+                    icon="warning",
+                    option_1="Ok",
+                )
+
             else:
                 self.export_thread = ExportThread(
                     target=export_images,
@@ -250,7 +315,8 @@ class ExportFrame(ctk.CTkFrame):
                         False,
                     ),
                 )
-                disable_UI_elements(self.export_sub_frame.export_button)
+                self.export_sub_frame.export_button.grid_forget()
+                # disable_UI_elements(self.export_sub_frame.export_button)
                 self.export_thread.daemon = True  # so the thread can be stopped likewise if the master frame is force-closed
                 self.export_thread.start()
         else:

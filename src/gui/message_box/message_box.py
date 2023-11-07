@@ -1,7 +1,8 @@
 """
-CustomTkinter Messagebox
+Credits
+This is a slightly modified CustomTkinter Messagebox implementation.
 Author: Akash Bora
-This is a modern messagebox made with customtkinter.
+License: CC0 1.0 (granting full rights to use commercially, privately, modify and distribute)
 Homepage: https://github.com/Akascape/CTkMessagebox
 """
 

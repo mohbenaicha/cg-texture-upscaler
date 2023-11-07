@@ -1,9 +1,8 @@
-import os
-import inspect
-from typing import List, Optional, Tuple
+import os, inspect
+from typing import Optional, Tuple, Union
 from pydantic import BaseModel, ValidationError
 from app_config.config import ExportConfig
-from model.utils import write_log_to_file
+from utils.export_utils import write_log_to_file
 
 log_file = write_log_to_file(None, None, None)
 
@@ -27,6 +26,7 @@ def validate_export_config(
     except ValidationError as error:
         errors = error.json()
         write_log_to_file("Error", f"Invalid export configuration: {config_obj}", log_file)
+    print(errors)
     return config_obj, errors
 
 
@@ -44,21 +44,26 @@ def validate_variable_gen_args(generator_args: dict):
 
 # for testing prediction
 class ExportConfigSchema(BaseModel):
-    available_devices: Optional[List[str]]
-    device: Optional[str]  
-    scale: Optional[str]  
-    export_format: Optional[str]  
-    compression: Optional[str]  
-    active_compression: Optional[Tuple[str,str]]
-    mipmaps: Optional[str]  
-    save_prefix: Optional[str]  
-    save_suffix: Optional[str]  
-    save_numbering: Optional[bool]  
-    save_in_existing_location: Optional[bool]  
-    single_export_location: Optional[str]
-    weight_file: Optional[str]
-    noise_level: Optional[float]
-
+    # available_devices: Optional[List[str]]
+    device: str
+    scale: str
+    export_format: str  
+    compression: Union[str,int,float]
+    active_compression: Tuple[str,str]
+    mipmaps: str
+    save_prefix: str
+    save_suffix: str
+    save_numbering: bool
+    save_in_existing_location: bool
+    single_export_location: str
+    weight_file: str
+    noise_level: float
+    upscale_precision: str
+    export_color_mode: str
+    color_space: str
+    export_color_depth: str
+    split_large_image: bool
+    padding_size: float
 
 class GeneratorArgumentSchema(BaseModel):
     scale: int

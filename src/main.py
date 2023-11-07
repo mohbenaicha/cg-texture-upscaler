@@ -1,11 +1,12 @@
-import sys
+import sys, os
 from typing import Dict, Union
 from tkinter import *
 import customtkinter as ctk
 from gui.frames.master_frame import MasterFrame
-from model import export_images
+from utils.export_utils import export_images
 from gui.frames import ExportThread
 from utils.cli_utils import parse_args, parser
+
 
 
 def main(args: Union[Dict[str, int | str | float], None]):

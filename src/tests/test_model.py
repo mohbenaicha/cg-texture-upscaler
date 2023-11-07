@@ -8,8 +8,8 @@ import pytest
 import torch
 import numpy
 import PIL
-from model.rrdbnet_arch import Generator
-from model.utils import export_images
+from model.arch import Generator
+from utils.export_utils import export_images
 from gui.frames.export_frame import ExportFrame, ExportThread
 # from conftest import test_generator_constructor, test_export_config
 

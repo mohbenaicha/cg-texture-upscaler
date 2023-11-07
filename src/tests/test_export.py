@@ -3,14 +3,12 @@ import sys
 sys.path.append("C:\\Users\\Moham\\Desktop\\official_cg_tool_dev_repo\\src")
 import os
 import time
-from functools import partial
-from typing import Any
 import torch
 import pytest
 from gui.frames.export_frame import ExportFrame, ExportThread
-from model.utils import export_images
+from utils.export_utils import export_images
 # from conftest import test_export_config  # TODO: remove
-from app_config.config import PrePostProcessingConfig as ppconf, ExportConfig
+from app_config.config import ConfigReference as confref, ExportConfig
 
 # export_config = partial(test_export_config, multiple_images=False)
 export_img_path = os.path.join(
@@ -121,7 +119,7 @@ def test_format(test_export_config):  # TODO: restore pytest fixture argument
     This test exports an image as various image formats and then reads them
     to ensure they export as expected.
     """
-    for frmt in ppconf.available_export_formats:
+    for frmt in confref.available_export_formats:
         # parsed_config = ExportFrame.parse_export_config(
         #     export_config().export_format_config_map[frmt]
         # )
@@ -158,8 +156,8 @@ def test_compression(test_export_config):  # TODO: restore pytest fixture argume
     for compression, config in test_export_config().compression_config_map.items():
         formats = [
             ext
-            for ext in list(ppconf.compression_map.keys())
-            if compression.lower() in ppconf.compression_map[ext]
+            for ext in list(confref.format_to_compression_map.keys())
+            if compression.lower() in confref.format_to_compression_map[ext]
         ]
 
         # adjusting the assertion condition to fit Image Magick's compression syntax

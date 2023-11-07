@@ -1,35 +1,113 @@
-from io import TextIOWrapper
-import os
-import shutil
-from typing import List, Dict, Union, Any
-from datetime import date, datetime
-import time
-from copy import deepcopy
+from typing import Tuple
 import math
-import customtkinter as ctk
-from PIL import Image, UnidentifiedImageError, ImageFilter, ImageEnhance
-from wand.image import Image as wand_image
-import cv2
 import numpy as np
 import torch
-from gui.message_box import CTkMessagebox
-from utils.events import enable_UI_elements
-from .rrdbnet_arch import Generator
-from caches.cache import image_paths_cache as im_cache
-from app_config.config import PrePostProcessingConfig as ppconf, ExportConfig
-
-# to be able to read wand-exported image files
-from PIL import ImageFile
-
-ImageFile.LOAD_TRUNCATED_IMAGES = True
+from torch import nn as nn
+from torch.nn import functional as F
+from torch.nn import init as init
+from torch.nn.modules.batchnorm import _BatchNorm
 
 
-def pad_reflect(image: torch.Tensor, pad_size: int):
+@torch.no_grad()
+def default_init_weights(module_list, scale=1, bias_fill=0, **kwargs):
+    """Initialize network weights.
+
+    Args:
+        module_list (list[nn.Module] | nn.Module): Modules to be initialized.
+        scale (float): Scale initialized weights, especially for residual
+            blocks. Default: 1.
+        bias_fill (float): The value to fill bias. Default: 0
+        kwargs (dict): Other arguments for initialization function.
+    """
+    if not isinstance(module_list, list):
+        module_list = [module_list]
+    for module in module_list:
+        for m in module.modules():
+            if isinstance(m, nn.Conv2d):
+                init.kaiming_normal_(m.weight, **kwargs)
+                m.weight.data *= scale
+                if m.bias is not None:
+                    m.bias.data.fill_(bias_fill)
+            elif isinstance(m, nn.Linear):
+                init.kaiming_normal_(m.weight, **kwargs)
+                m.weight.data *= scale
+                if m.bias is not None:
+                    m.bias.data.fill_(bias_fill)
+            elif isinstance(m, _BatchNorm):
+                init.constant_(m.weight, 1)
+                if m.bias is not None:
+                    m.bias.data.fill_(bias_fill)
+
+
+class ResidualBlockNoBN(nn.Module):
+    """Residual block without BN
+    Args:
+        num_feat (int): Channel number of intermediate features.
+            Default: 64.
+        res_scale (float): The value by which to scale down the residual layer. Default: 0.2
+        pytorch_init (bool): If set to True, use pytorch default init,
+            otherwise, use default_init_weights. Default: False.
+    """
+
+    def __init__(self, num_feat=64, res_scale=1, pytorch_init=False):
+        super().__init__()
+        self.res_scale = res_scale
+        self.conv1 = nn.Conv2d(num_feat, num_feat, 3, 1, 1, bias=True)
+        self.conv2 = nn.Conv2d(num_feat, num_feat, 3, 1, 1, bias=True)
+        self.relu = nn.ReLU(inplace=True)
+
+        if not pytorch_init:
+            default_init_weights([self.conv1, self.conv2], 0.1)
+
+    def forward(self, x):
+        """
+        Args:
+            x (torch.Tensor): the input image tensor
+
+        Returns:
+            torch.Tensor: the output image tensor
+        """
+        identity = x
+        out = self.conv2(self.relu(self.conv1(x)))
+        return identity + out * self.res_scale
+
+
+class Upsample(nn.Sequential):
+    """Upsample module.
+    Args:
+        scale (int): Scale factor. Supported scales: 2^2 and 2^3.
+        num_feat (int): Channel number of intermediate features.
+    """
+
+    def __init__(self, scale, num_feat):
+        m = []
+        if (scale & (scale - 1)) == 0:  # scale = 2^n
+            for _ in range(int(math.log(scale, 2))):
+                m.append(nn.Conv2d(num_feat, 4 * num_feat, 3, 1, 1))
+                m.append(nn.PixelShuffle(2))
+        elif scale == 3:
+            m.append(nn.Conv2d(num_feat, 9 * num_feat, 3, 1, 1))
+            m.append(nn.PixelShuffle(3))
+        else:
+            raise ValueError(
+                f"scale {scale} is not supported. " "Supported scales: 2x and 4x."
+            )
+        super(Upsample, self).__init__(*m)
+
+
+# The following are slightly editted utility functions for dividing an image
+# into patching and applying padding for the purposes of training and inference
+# in case the images are too large to fit on memory.
+# Credits for the following list of functions belong to AI Forever
+# https://github.com/ai-forever/Real-ESRGAN/blob/main/RealESRGAN/utils.py
+
+
+def pad_reflect(image: np.ndarray, pad_size: int) -> np.ndarray:
     imsize = image.shape
     height, width = imsize[:2]
-    new_img = np.zeros([height + pad_size * 2, width + pad_size * 2, imsize[2]]).astype(
-        np.uint8
-    )
+    new_img = np.zeros(
+        [height + pad_size * 2, width + pad_size * 2, imsize[2]]
+    )  # .astype(np.uint8)
     new_img[pad_size:-pad_size, pad_size:-pad_size, :] = image
 
     new_img[0:pad_size, pad_size:-pad_size, :] = np.flip(
@@ -48,438 +126,122 @@ def pad_reflect(image: torch.Tensor, pad_size: int):
     return new_img
 
 
-def unpad_image(image: torch.Tensor, pad_size: int):
+def unpad_image(image: np.ndarray, pad_size: int) -> torch.Tensor:
     return image[pad_size:-pad_size, pad_size:-pad_size, :]
 
 
-def load_model(device, scale, load: bool = True):
-    from model import RESRGAN
-
-    model = RESRGAN(device=device, scale=scale)
-    if load:
-        model.load_weights(os.path.join(ExportConfig.weight_file, f"{scale}x.pth"))
-    return model.gen
-
-
-def write_log_to_file(log_type:str , message: str, log_file: TextIOWrapper=None):
-    if not log_file:
-        if not os.path.exists("logs"):
-            os.mkdir("logs")
-
-        if not os.path.exists(
-            os.path.join("logs", f"log-{date.today().strftime('%d-%m-%Y')}.txt")
-        ):
-            log_file = open(
-                os.path.join("logs", f"log-{date.today().strftime('%d-%m-%Y')}.txt"),
-                "w",
-            )
-        else:
-            log_file = open(
-                os.path.join("logs", f"log-{date.today().strftime('%d-%m-%Y')}.txt"),
-                "a",
-            )
-        return log_file
-
-    log_file.write(f"[{log_type}] - {datetime.now().strftime('%H:%M:%S')}: {message}\n")
-
-    return log_file
-
-
-# TODO: implement
-def handle_alpha(rgb_img: Image, rgb_alpha, optimize:bool, bl:int, br:float, co:float, file:str):
-    not_impletement = True
-    if not_impletement:
-        raise NotImplementedError
-    # convert alphamap to 8bit greyscale to increase processing speed (it's greyscale only)
-    # greyscale_alpha = rgb_alpha.convert("L")
-    greyscale_alpha = rgb_alpha
-    # only perform this if alpha optimizations are desired
-    if optimize:
-        # apply gaussian blur
-        if bl != 0:
-            greyscale_alpha = greyscale_alpha.filter(ImageFilter.GaussianBlur(bl))
-        # apply brightness
-        if br != 0.0:
-            greyscale_alpha = ImageEnhance.Brightness(greyscale_alpha).enhance(1.0 + br)
-        # apply contrast
-        if co != 0.0:
-            greyscale_alpha = ImageEnhance.Contrast(greyscale_alpha).enhance(1.0 + co)
-
-    greyscale_alpha.save(os.path.join("results", "test_POST_alpha_" + file))
-    # merge alpha channel with RGB
-    return rgb_img
-
-
-def calc_mipmaps(user_choice:str, image:torch.Tensor):
-    if user_choice == "max":
-        user_choice = float(1)
-    else:
-        user_choice = float(user_choice[:-1]) / 100
-    limiting_dim = math.log2(min(image.size))
-    return str(round(user_choice * limiting_dim, 0))
-
-
-def handle_mipmaps(export_config:dict, img:torch.Tensor):
-    # if export_config["format"] == "dds":
-    if not export_config["mipmaps"] == "none":
-        num_mipmaps = calc_mipmaps(export_config["mipmaps"], img)
-        img.options["dds:mipmaps"] = num_mipmaps
-    else:
-        img.options["dds:mipmaps"] = "0"
-
-
-def handle_naming(export_config: dict[str, Any], im_name, index):
-    id = (str(index) + "_") if export_config["numbering"] else ""
-    prefix = export_config["prefix"] + ("_" if export_config["prefix"] != "" else "")
-    suffix = (("_" if export_config["suffix"] != "" else "")) + export_config["suffix"]
-    format = export_config["format"]
-    im_name = f"{id}{prefix}{im_name[:-4]}{suffix}.{format}"
-    return im_name
-
-
-def handle_dimensions(img:torch.Tensor, im_name:str, log_file: TextIOWrapper):
-    shape: List[int] = list(img.size)
-    changed = False
-    if shape[0] % 2 != 0:
-        shape[0] += 1
-        changed = True
-    if shape[1] % 2 != 0:
-        shape[1] += 1
-        changed = True
-
-    if changed:
-        write_log_to_file(
-            "WARNING",
-            f"Reshaped image {im_name} to dimensions {shape[0]}x{shape[1]} to allow for processing. Please double-check that this has not affected the UV mapping.",
-            log_file,
-        )
-        img = img.resize(tuple(shape))
-    return img
-
-
-def unsharp_mask(
-    image: np.array,
-    kernel_size: tuple = (5, 5),
-    sigma: float = 1.0,
-    amount: float = 1.0,
-    threshold: float = 0,
-):
+def pad_patch(
+    image_patch: np.ndarray, padding_size: int, channel_last: bool = True
+) -> np.ndarray:
+    """Pads image_patch with with padding_size edge values.
+    w: (pad size left, pad size right), h: (pad_size upper, padsize lower), c (0,0) - i.e the same 3 channels maintained
     """
-    Return a sharpened version of the image, using an unsharp mask.
-    Credit: Soroush (2019). https://stackoverflow.com/questions/4993082/how-can-i-sharpen-an-image-in-opencv.
-    """
-    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
-    sharpened = float(amount + 1) * image - float(amount) * blurred
-    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
-    sharpened = np.minimum(sharpened, 255 * np.ones(sharpened.shape))
-    sharpened = sharpened.round().astype(np.uint8)
-    if threshold > 0:
-        low_contrast_mask = np.absolute(image - blurred) < threshold
-        np.copyto(sharpened, image, where=low_contrast_mask)
-    return sharpened
 
-
-def handle_noise(
-    noisy_image: np.array, denoised_image: np.array, scale: int, noise_factor: float
-):
-    noisy_image = unsharp_mask(
-        cv2.resize(
-            src=noisy_image,
-            dsize=tuple(dim * scale for dim in noisy_image.shape[:2][::-1]),
-            interpolation=cv2.INTER_LANCZOS4,
+    if channel_last:
+        return np.pad(
+            image_patch,
+            ((padding_size, padding_size), (padding_size, padding_size), (0, 0)),
+            "edge",
         )
+    else:
+        return np.pad(
+            image_patch,
+            ((0, 0), (padding_size, padding_size), (padding_size, padding_size)),
+            "edge",
+        )
+
+
+def unpad_patches(image_patches: torch.Tensor, padding_size: int) -> torch.Tensor:
+    """
+    For each patch in the tensor (along dim 0) only retain padding_size to -padding_size along the
+    height and the width (dim 1 and 2) for each channel (dim 3)
+    """
+    return image_patches[:, padding_size:-padding_size, padding_size:-padding_size, :]
+
+
+def split_image_into_overlapping_patches(
+    image_array: np.ndarray, patch_size: int, padding_size: int = 2
+) -> Tuple[np.ndarray, Tuple[int]]:
+    """Splits the image into partially overlapping patches.
+    The patches overlap by padding_size pixels.
+    Pads the image twice:
+        - first to have a size multiple of the patch size,
+        - then to have equal padding at the borders.
+    Args:
+        image_array: numpy array of the input image.
+        patch_size: size of the patches from the original image (without padding).
+        padding_size: size of the overlapping area.
+    """
+
+    xmax, ymax, _ = image_array.shape
+    x_remainder = xmax % patch_size
+    y_remainder = ymax % patch_size
+
+    # modulo here is to avoid extending of patch_size instead of 0
+    x_extend = int((patch_size - x_remainder) % patch_size)
+    y_extend = int((patch_size - y_remainder) % patch_size)
+
+    # make sure the image is divisible into regular patches
+    extended_image = np.pad(
+        array=image_array, pad_width=((0, x_extend), (0, y_extend), (0, 0)), mode="edge"
     )
-    img = noisy_image * (noise_factor) + denoised_image * 255.0 * (1-noise_factor)
-    return img / 255.0
+
+    # add padding around the image to simplify computations
+    padded_image = pad_patch(extended_image, padding_size, channel_last=True)
+    xmax, ymax, _ = padded_image.shape
+    patches = []
+
+    x_lefts = range(padding_size, xmax - padding_size, patch_size)
+    y_tops = range(padding_size, ymax - padding_size, patch_size)
+
+    for x in x_lefts:
+        for y in y_tops:
+            x_left = x - padding_size
+            y_top = y - padding_size
+            x_right = x + patch_size + padding_size
+            y_bottom = y + patch_size + padding_size
+            patch = padded_image[x_left:x_right, y_top:y_bottom, :]
+            patches.append(patch)
+
+    return (np.array(patches), padded_image.shape)
 
 
-def export_images(
-    master: ctk.CTkFrame = None,
-    export_config: Union[Dict[str, Union[str, int, bool]], None] = None,
-    gen: Union[Generator, None] = None,
-    export_indices: Union[List[int], None] = None,
-    prog_bar=None,
-    stop_export_button=None,
-    verbose:True=False,
-    task=None,
-):
-    if export_indices == "all":
-        export_indices = list(range(0, len(im_cache[0])))
-    log_file = write_log_to_file(None, None, None)
-    warning_mssg = False
-    process = True
-    if export_config == None:
-        write_log_to_file("ERROR", f"No export config found: {export_config}", log_file)
-        warning_mssg = True
-        process = False
+def stitch_together(
+    patches: torch.Tensor,
+    padded_image_shape: Tuple[int],
+    target_shape: Tuple[int],
+    padding_size: int = 4,
+    no_channels: int = 3,
+) -> np.ndarray:
+    """Reconstruct the image from overlapping patches.
+    After scaling, shapes and padding should be scaled too.
+    Args:
+        patches: patches obtained with split_image_into_overlapping_patches
+        padded_image_shape: shape of the padded image contructed in split_image_into_overlapping_patches
+        target_shape: shape of the final image
+        padding_size: size of the overlapping area.
+        no_channels: number of channels in the original image (thus far, the Generator only supports a 3-channel image)
+    """
 
-    if (
-        not export_config["export_to_original"]
-        and export_config["single_export_location"] == ""
-    ):
-        write_log_to_file(
-            "ERROR",
-            f"No export location defined: \n\tOriginal export location: {export_config['export_to_original']} \n\tSingle export location: {export_config['single_export_location']}",
-            log_file,
-        )
-        warning_mssg = True if master else False
-        process = False
+    xmax, ymax, _ = padded_image_shape
+    patches = unpad_patches(patches, padding_size)
+    patch_size = patches.size()[1]
+    n_patches_per_row = ymax // patch_size
+
+    complete_image = torch.zeros((xmax, ymax, no_channels), dtype=patches.dtype)
+
+    row = -1
+    col = 0
+    for i in range(len(patches)):
+        if i % n_patches_per_row == 0:
+            row += 1
+            col = 0
+        complete_image[
+            row * patch_size : (row + 1) * patch_size,
+            col * patch_size : (col + 1) * patch_size,
+            :,
+        ] = patches[i]
+        col += 1
         
-    if process:
-        cache_copy = deepcopy(im_cache)
-
-        if master:
-            prog_bar.grid(row=1, column=0, sticky="w", padx=7, pady=2)
-            stop_export_button.grid(row=2, column=0, sticky="we", padx=7, pady=2)
-            step_size = 1 / len(export_indices)
-
-        start_time = time.time()
-        count, alpha_count, progress = 0, 0, 0
-        if master:
-            prog_bar.set(value=progress)
-
-        if export_config["scale"] != "none":
-            scale = int(export_config["scale"][:1])
-            try:
-                generator = (
-                    load_model(
-                        device=export_config["device"],
-                        scale=scale,
-                    )
-                    if gen == None
-                    else gen
-                )
-                generator.eval()
-            except Exception as e:
-                warning_mssg = True
-                write_log_to_file(
-                    "Error",
-                    f"Failed to process selected image(s) due to: \n\t{e}\n",
-                    log_file,
-                )
-                process = False  # no saved_model directory/generator weights found
-
-        else:
-            write_log_to_file(
-                "INFO",
-                f"Skipping upscaling, chosen scale factor: {export_config['scale']}",
-                log_file,
-            )
-            generator = None
-
-        if process:
-            for i in export_indices:
-                im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-                img = os.path.join(im_path, im_name)
-                sub_time_start = time.time()
-                count += 1
-
-                try:
-                    if not master and verbose:
-                        print(f"\nAttempting to process file:\n\t {img}\n")
-                    im_obj = Image.open(img)
-                except Exception as e:
-                    if type(e) == UnidentifiedImageError:
-                        write_log_to_file(
-                            "Error",
-                            f"Could not process file {im_name} since it is not a recognized image format: \n (path: {img}).",
-                            log_file,
-                        )
-                    else:
-                        write_log_to_file(
-                            "Error",
-                            f"Could not process file {im_name} due to an unhandled exception: \n (path: {img}).",
-                            log_file,
-                        )
-                    warning_mssg = True if master else False
-                    continue
-
-                im_obj = handle_dimensions(im_obj, im_name, log_file)
-
-                noisy_copy = np.asarray(deepcopy(im_obj))
-
-                if generator:
-                    try:
-                        if im_obj.mode in ("RGBA", "LA") or (
-                            im_obj.mode == "P" and "transparency" in im_obj.info
-                        ):
-                            alpha_count += 1
-                            alpha = im_obj.split()[-1].convert("RGB")
-                            im_obj = im_obj.convert("RGB")
-
-                            with torch.no_grad():
-                                write_log_to_file(
-                                    "INFO",
-                                    f"Found an alpha channel for image: {im_name}, scaling RGBA channels.",
-                                    log_file,
-                                )
-                                upscaled_img = generator(
-                                    ppconf.test_transform(image=np.asarray(im_obj))[
-                                        "image"
-                                    ]
-                                    .unsqueeze(0)
-                                    .to(export_config["device"])
-                                )[0]
-
-                                upscaled_alpha = generator(
-                                    ppconf.test_transform(image=np.asarray(alpha))[
-                                        "image"
-                                    ]
-                                    .unsqueeze(0)
-                                    .to(export_config["device"])
-                                )[0]
-                                alpha_to_greyscale = (
-                                    upscaled_alpha[0] * (0.2989)
-                                    + upscaled_alpha[1] * (0.5870)
-                                    + upscaled_alpha[2] * (0.1140)
-                                )
-                                upscaled_img = torch.cat(
-                                    [upscaled_img, alpha_to_greyscale.unsqueeze(0)],
-                                    0,
-                                )
-
-                        else:
-                            write_log_to_file(
-                                "INFO",
-                                f"Found no alpha channel for image: {im_name}, only scaling RGB channels.",
-                                log_file,
-                            )
-                            with torch.no_grad():
-                                upscaled_img = generator(
-                                    ppconf.test_transform(
-                                        image=np.asarray(im_obj.convert("RGB"))
-                                    )["image"]
-                                    .unsqueeze(0)
-                                    .to(export_config["device"])
-                                )[0]
-                        img_arr = upscaled_img.permute(1, 2, 0).detach().cpu().numpy()
-
-                    except Exception as e:
-                        if type(e) == torch.cuda.OutOfMemoryError:
-                            write_log_to_file(
-                                "ERROR",
-                                f"Could not process {img}. There isn't enough video memory to allocate for processing the image. Try a smaller scale, or scale using CPU as the device settings \n (path: {img}).",
-                                log_file,
-                            )
-                        else:
-                            write_log_to_file(
-                                "ERROR",
-                                f"Could not process {img}. The program ran into an unhandled error. \n (path: {img})."
-                                f"ERROR: \n\n{e}\n\n",
-                                log_file,
-                            )
-                        warning_mssg = True if master else False
-                        continue
-                else:
-                    img_arr = np.asarray(im_obj)
-
-                # the follwing is a workaroud so wand's mip map generation doesn't eliminate RGB information on the mipmaps where alpha = 0 on the original
-                # full scale layer adding a 1 to the pixel value seems incosequential for Alpha and RGB channels
-                if export_config["mipmaps"] != "none":
-                    img_arr = np.copy(img_arr)
-                    img_arr[np.where(img_arr == 0)] += 1
-
-                # handle denoise level
-                try:
-                    img_arr = handle_noise(
-                        noisy_image=noisy_copy,
-                        denoised_image=img_arr,
-                        scale=scale,
-                        noise_factor=export_config['noise_level'],
-                    )
-                except:
-                    pass  # this is undefined variable error
-
-                with wand_image.from_array(img_arr) as img:
-                    img.format = export_config["format"]
-                    img.compression = (
-                        export_config["compression"]
-                        if not export_config["compression"] == "none"
-                        else "no"
-                    )
-                    handle_mipmaps(export_config, img)
-                    im_name = handle_naming(export_config, im_name, i)
-
-                    if export_config["export_to_original"]:
-                        save_path = os.path.join(im_path, im_name)
-                    else:
-                        save_path = os.path.join(
-                            export_config["single_export_location"], im_name
-                        )
-                    img.save(filename=save_path)
-                    write_log_to_file(
-                        "INFO", f"Saved {im_name} to {save_path}", log_file
-                    )
-                    if not master and verbose:
-                        print(f"\n[INFO] Saved {im_name} to {save_path}\n")
-                if master:
-                    progress += step_size
-                    prog_bar.set(value=progress)
-                write_log_to_file(
-                    "INFO",
-                    f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
-                    log_file,
-                )
-                if task.stopped():
-                    break
-
-            tot_time = round(time.time() - start_time, 2)
-            write_log_to_file(
-                "INFO",
-                f"Total time to upscale {count} image(s): {tot_time} seconds for an average of {round(tot_time/count,2)} seconds per image ({alpha_count} total image(s) had alpha channel information).",
-                log_file,
-            )
-            task.stop()
-            # sleep before removing progress bar
-            time.sleep(0.5)
-        if master:
-            prog_bar.grid_forget()
-            stop_export_button.grid_forget()
-
-    if warning_mssg:
-        warn_mssg = (
-            f"Some files were not processed. Please refer to the latest log file. \n\nPlease ensure you have: \n\n"
-            f" 1. You (or your anti-virus) haven't tampered with the saved_model directory if upscaling. \n "
-            f" 2. Ensure the weight files 2x and/or 4x exist for the upscaling factor you wish to use, if upscaling. \n "
-            f" 3. You aren't trying to process a file that is not an image. \n "
-            f" 4. This application has read and write permissions from and/to the source/target directories. \n "
-            f" 5. There is sufficient video memory and disk space to process and save the images, if upscaling. \n "
-        )
-        CTkMessagebox(
-            title="Error Message!",
-            width=400,
-            message=warn_mssg,
-            icon="warning",
-            option_1="Ok",
-        )
-        if not master and verbose:
-            print(warn_mssg)
-    if master != None:
-        enable_UI_elements(master.export_sub_frame.export_button)
-
-
-def copy_files(export_indices: Union[List[int], None] = None, copy_location: str = ""):
-    log_file = write_log_to_file(None, None, None)
-    warning_mssg = False
-    cache_copy = deepcopy(im_cache)
-    for i in export_indices:
-        im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-        source_img = os.path.join(im_path, im_name)
-        target_img = os.path.join(copy_location, im_name)
-        try:
-            shutil.copyfile(source_img, target_img)
-        except Exception as e:
-            write_log_to_file(
-                "Error",
-                f"Ran into an error when attempting to copy file {im_name}\n  (path: {im_path})",
-                log_file,
-            )
-            warning_mssg = True
-
-    if warning_mssg:
-        CTkMessagebox(
-            title="Warning Message!",
-            message=f"Some files were not copied. Please refer to the latest log file.",
-            icon="warning",
-            option_1="Ok",
-        )
+    complete_image=complete_image[padding_size : target_shape[0] + padding_size, padding_size : target_shape[1] + padding_size, :]
+    return complete_image

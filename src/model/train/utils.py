@@ -95,9 +95,9 @@ def make_patches(data_dir):
 
 
 
-def delete_small_images(data_dir)
+def delete_small_images(data_dir):
     for file in os.listdir(data_dir):
-        path = os.path.join(root_and_dir, file)
+        path = os.path.join(data_dir, file)
         image = cv2.imread(path)
         if image.shape[1] < 65 or image.shape[2] < 65:
             os.remove(path)

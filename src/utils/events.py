@@ -6,7 +6,7 @@ from app_config.config import (
     SearchConfig,
     GUIConfig,
     ExportConfig,
-    PrePostProcessingConfig as ppconfig,
+    ConfigReference as confref,
 )
 
 
@@ -99,24 +99,9 @@ def recursive_checkbox_event(
     lb_frame.populate(parent_dir.get(), recursive.get(), add=False)
 
 
-def print_to_frame(frame: ctk.CTkFrame, string: str, grid: bool, error: bool, **kwargs):
-    try:
-        frame = frame.error_label
-        frame.configure(text="\t")
-    except:
-        frame = frame.label
-        frame.configure(text="")
-
-    if error:
-        # frame.configure(text=string)
-        frame = ctk.CTkLabel(
-            master=frame.master,
-            text=string,
-            font=kwargs.get("font"),
-            text_color=kwargs.get("text_color"),
-            width=kwargs.get("lbl_width"),
-            height=kwargs.get("lbl_height"),
-        )
+def print_to_frame(frame: ctk.CTkFrame, string: str, grid: bool, **kwargs):
+    if string:
+        frame.configure(text=string)
         if grid:
             frame.grid(
                 row=kwargs.get("row"),
@@ -128,20 +113,24 @@ def print_to_frame(frame: ctk.CTkFrame, string: str, grid: bool, error: bool, **
         else:
             frame.pack(side=kwargs.get("side"))
     else:
-        frame.configure(text=string)
+        if grid:
+            frame.grid_forget()
+        else:
+            frame.pack_forget()
+    
 
 
 def handle_following_menus(
     master_frame: Union[ctk.CTkOptionMenu, None] = None, format: str = "dds"
 ):
-    ExportConfig.active_compression = ppconfig.compression_map[format]
+    ExportConfig.active_compression = confref.format_to_compression_map[format]
     master_frame.compression_subframe.menu.configure(
         values=list(ExportConfig.active_compression)
     )
 
     if ExportConfig.active_compression == ("undefined"):
         disable_UI_elements(master_frame.compression_subframe.menu_tt)
-    if not ppconfig.supports_mipmaps[format]:
+    if not confref.supports_mipmaps[format]:
         disable_UI_elements(master_frame.additional_options_subframe.menu)
 
 
@@ -156,6 +145,9 @@ def disable_UI_elements(
 
     if isinstance(element, ctk.CTkEntry):
         element.delete(0, ctk.END)
+    
+    if isinstance(element, ctk.CTkSlider):
+        element.set(0.0)
 
 
 def enable_UI_elements(

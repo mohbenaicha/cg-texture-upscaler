@@ -1,14 +1,17 @@
+
 import customtkinter as ctk
 from gui.tooltips import Hovertip_Frame
 from gui.tooltips import tooltip_text as ttt
-import utils.ctk_fonts as fonts
+from gui.frames import *
+import gui.ctk_fonts as fonts
 from app_config.config import GUIConfig
-from gui.frames.search_filter_frame import SearchFilterFrame
-from gui.frames.export_options_frame import ExportOptionsFrame
-from gui.frames.export_frame import ExportFrame
-from gui.frames.main_listbox_frame import TkListbox
-from gui.frames.file_or_folder_frame import FileOrFolderFrame
-from gui.frames.top_level_frames import SaveConfigWindow, LoadConfigWindow
+# from gui.frames.top_level_frames import SaveConfigWindow, LoadConfigWindow
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from gui.frames import *
+
 
 
 class AppAndUIOptions(ctk.CTkFrame):
@@ -21,11 +24,22 @@ class AppAndUIOptions(ctk.CTkFrame):
         self.configure(width=kwargs.get("width"))
         self.odd = False
         self.lb_frame: TkListbox = kwargs.get("lb_frame")
+        self.addit_sett_frame: AdditionalOptionsFrame = kwargs.get("addit_sett_frame")
         self.save_toplevel_window: None | SaveConfigWindow = None
         self.load_toplevel_window: None | LoadConfigWindow = None
         self.setup_subframes()
 
     def setup_subframes(self):
+        self.title_label_subframe = ctk.CTkFrame(
+            master=self, fg_color="transparent", width=1, height=25
+        )  # subframe to pack select file and folder buttons
+        self.title_label_subframe.label = ctk.CTkLabel(
+            master=self.title_label_subframe,
+            font=fonts.header_labels_font(),
+            text="           User Interface",
+            height=20,
+            width=50,
+        )
         self.config_subframe = ctk.CTkFrame(
             master=self, fg_color="transparent", width=1, height=25
         )  # subframe to pack select file and folder buttons
@@ -78,8 +92,9 @@ class AppAndUIOptions(ctk.CTkFrame):
         self.scale_gui_label = ctk.CTkLabel(
             self.scale_subframe,
             text="GUI Scale",
-            width=1,
+            width=280,
             height=10,
+            anchor="w",
             font=fonts.labels_font(),
         )
         self.gui_scale: float = 1
@@ -118,10 +133,11 @@ class AppAndUIOptions(ctk.CTkFrame):
         # theme
         self.theme_label = ctk.CTkLabel(
             self.theme_subframe,
-            text="Appearnace",
-            width=1,
+            text="Appearance",
+            width=300,
             height=10,
-            font=fonts.labels_font(),
+            anchor="w",
+            font=fonts.list_font(),
         )
 
         self.theme_color = ctk.BooleanVar(value=False)
@@ -141,12 +157,10 @@ class AppAndUIOptions(ctk.CTkFrame):
             bg_color=GUIConfig.tooltip_color,
             text_color=GUIConfig.tooltop_text_color,
         )
-
         # experimental label
         self.expetimental_label = ctk.CTkLabel(
             self, text="(Experimental)", width=1, height=10, font=fonts.labels_font()
         )
-
         self.plot_self()
 
     def plot_self(self):
@@ -154,14 +168,16 @@ class AppAndUIOptions(ctk.CTkFrame):
         self.plot_frame_elements()
 
     def plot_frame_elements(self):
-        self.config_subframe.grid(row=2, column=1, sticky="nesw", padx=20, pady=3)
-        self.theme_subframe.grid(row=3, column=1, sticky="nesw", padx=5, pady=3)
-        self.expetimental_label.grid(row=4, column=1, sticky="nsw", padx=30, pady=1)
-        self.scale_subframe.grid(row=5, column=1, sticky="nesw", padx=5, pady=3)
-
-        self.load_conf_button.grid(row=1, column=1, sticky="nesw", padx=5, pady=5)
-        self.save_conf_button.grid(row=1, column=2, sticky="nesw", padx=5, pady=5)
-
+        self.title_label_subframe.grid(row=0, column=1, sticky="nesw", padx=20, pady=3)
+        self.title_label_subframe.label.grid(
+            row=0, column=1, sticky="nesw", padx=20, pady=3
+        )
+        self.config_subframe.grid(row=4, column=1, sticky="nesw", padx=20, pady=3)
+        self.theme_subframe.grid(row=1, column=1, sticky="nesw", padx=5, pady=3)
+        self.expetimental_label.grid(row=2, column=1, sticky="nsw", padx=30, pady=1)
+        self.scale_subframe.grid(row=3, column=1, sticky="nesw", padx=5, pady=3)
+        self.load_conf_button.grid(row=1, column=1, sticky="nse", padx=5, pady=5)
+        self.save_conf_button.grid(row=1, column=2, sticky="nsw", padx=5, pady=5)
         self.scale_gui_label.grid(row=1, column=1, sticky="ew", padx=25, pady=2)
         self.increase_gui_scale_button.grid(
             row=1, column=2, sticky="ew", padx=7, pady=2
@@ -169,11 +185,11 @@ class AppAndUIOptions(ctk.CTkFrame):
         self.decrease_gui_scale_button.grid(
             row=1, column=3, sticky="ew", padx=1, pady=2
         )
-
         self.theme_label.grid(row=1, column=1, sticky="ew", padx=25, pady=2)
         self.theme_toggle_switch.grid(row=1, column=2, sticky="ew", padx=1, pady=2)
 
     def load_config_event(self):
+        from gui.frames import LoadConfigWindow
         if (
             self.load_toplevel_window is None
             or not self.load_toplevel_window.winfo_exists()
@@ -185,6 +201,7 @@ class AppAndUIOptions(ctk.CTkFrame):
                 exp_opts_frame=self.expopts_frame,
                 export_frame=self.export_frame,
                 lb_frame=self.lb_frame,
+                addit_sett_frame=self.addit_sett_frame
             )
             self.load_toplevel_window.attributes("-topmost", 1)
             self.load_toplevel_window.focus_set()
@@ -192,6 +209,7 @@ class AppAndUIOptions(ctk.CTkFrame):
             self.load_toplevel_window.focus_set()
 
     def save_config_event(self):
+        from gui.frames import SaveConfigWindow
         if (
             self.save_toplevel_window is None
             or not self.save_toplevel_window.winfo_exists()
@@ -261,7 +279,6 @@ class AppAndUIOptions(ctk.CTkFrame):
                 bg_color=GUIConfig.light_theme_color,
             )
             image_lb.listbox_scrollbar.configure(fg_color=GUIConfig.light_theme_color)
-
             if config_win != None:
                 config_win.listbox.configure(
                     selectbackground="#4F4F4F",
