@@ -269,7 +269,7 @@ class ExportFrame(ctk.CTkFrame):
                 "gamma_adjustment": valid_config.get("gamma_adjustment", None),
                 "export_color_depth": valid_config.get("export_color_depth", "8-bit"),
                 "split_large_image": valid_config.get("split_large_image", True),
-                "padding_size": valid_config.get("padding_size", 0.0),
+                "split_size": valid_config.get("split_size", 0.0),
             }
             print(export_config)
             return export_config

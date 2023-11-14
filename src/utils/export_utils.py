@@ -145,7 +145,7 @@ def handle_dimensions(
 def handle_unprocessed_images(unprocessed_list):
     return "\n" + "\n".join(
         [
-            f" - {unprocessed_list[i][0]} >> {unprocessed_list[i][1]}"
+            f" - {unprocessed_list[i][0]} > > > {unprocessed_list[i][1]}"
             for i in range(len(unprocessed_list))
         ]
     )
@@ -155,12 +155,14 @@ def unsharp_mask(
     image: np.ndarray,
     kernel_size: tuple = (5, 5),
     sigma: float = 1.0,
-    amount: float = 1.0,
-    threshold: float = 0,
-    dtype: str = "uint8",
+    amount: float = 1.0, # 
+    threshold: float = 0, # 0 to 1
+    input_dtype: str = "uint8"
 ):
     """
     Return a sharpened version of the image, using an unsharp mask.
+    This is a modified version of Soroush (2019) that incorporates various color depth adjustments and condenses some operations .
+    Comments have been added for clarification of the steps.
     Credit: Soroush (2019). https://stackoverflow.com/questions/4993082/how-can-i-sharpen-an-image-in-opencv.
     """
     scale_ = {
@@ -169,15 +171,16 @@ def unsharp_mask(
         "float16": 1.0,
         "float32": 1.0,
         "float64": 1.0,
-    }[dtype]
+    }
     blurred = cv2.GaussianBlur(image, kernel_size, sigma)
-    sharpened = float(amount + 1) * image - float(amount) * blurred
-    sharpened = np.maximum(sharpened, np.zeros(sharpened.shape))
-    sharpened = np.minimum(sharpened, scale_ * np.ones(sharpened.shape))
-    sharpened = sharpened.round().astype(dtype)
-    if threshold > 0:
-        low_contrast_mask = np.absolute(image - blurred) < threshold
-        np.copyto(sharpened, image, where=low_contrast_mask)
+    sharpened = float(amount + 1) * image - float(amount) * blurred # combine a ratio of the original image and blurred image; the blurry image is generated using a guassian distribution
+    sharpened = np.clip(sharpened, 0, scale_[input_dtype])
+    
+    sharpened = sharpened.astype(input_dtype)
+    if threshold > 0: 
+        # don't sharpen pixel values less than the threshold
+        low_contrast_mask = np.absolute(image - blurred) < threshold * scale_[input_dtype] # yields array of true/false values
+        np.copyto(sharpened, image, where=low_contrast_mask) # restore the original pixel values where the threshold holds
     return sharpened
 
 
@@ -211,9 +214,11 @@ def handle_downscaling(image: np.ndarray) -> np.ndarray:
     orig_dtype = image.dtype
     image = cv2.resize(
         src=image.astype("float32" if orig_dtype == "float16" else orig_dtype),
-        dsize=tuple(int(dim * 0.5) for dim in image.shape[:2][::-1]),
+        dsize=tuple(int(dim / 2) for dim in image.shape[:2][::-1]),
         interpolation=cv2.INTER_LANCZOS4,
     )
+    if len(image.shape) == 2:
+        image = np.expand_dims(image, 2)
     return image
 
 
@@ -283,7 +288,7 @@ def handle_padding_size(size: int) -> int:
     # take the lesser of the dimensions since the padding size is a % that,
     # if dependent on the longer dimension, may exceed the length of the
     # shorter dimension
-    pad_size = math.floor(ExportConfig.padding_size * min(size[:2]) / 2)
+    pad_size = math.floor(0.03 * min(size[:2]) / 2)
     pad_size = int(pad_size) if pad_size % 2 == 0 else int(pad_size + 1)
     return pad_size
 
@@ -308,10 +313,10 @@ def handle_image_split(channel_type: str = "color") -> Tuple[np.ndarray, int]:
     # required for other images is:
     # w x h x scale x (vram for 512x512 image) x (pixel count of 512x512 image)
 
-    factor: float = (1 / 262144) * scale * 2 * 0.1835
-    required_vram: float = (size[0] * size[1]) * factor
-    split = True if max_vram * 0.95 < required_vram else False
-
+    max_size_to_split = confref.split_sizes[ExportConfig.patch_size][1] #4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
+    print("----max_size_to_split ", max_size_to_split)
+    split = True if size[0]*size[1]*scale*scale > max_size_to_split else False
+    
     if split:
         if channel_type == "color":
             confref.split_color: bool = True
@@ -325,16 +330,17 @@ def handle_image_split(channel_type: str = "color") -> Tuple[np.ndarray, int]:
                 img.color_channels if channel_type == "color" else img.alpha, pad_size
             )
             min_ = min(lr_image.shape[:2])
-            max_ = max(lr_image.shape[:2])
             no_patches = 0
             while True:  # maximum of 50 x 50 patches
                 no_patches += 1
                 patch_size = (min_ / no_patches) + pad_size * 2
-                if (patch_size**2) * factor < max_vram:
+                print("Candidate patch size::: ", patch_size)
+                if (patch_size*scale)**2 <= max_size_to_split:
                     patch_size = math.ceil(min_ / no_patches)
                     break
-            if not patch_size % 2 == 0:
-                patch_size -= 1
+            patch_size += (1 if not patch_size % 2 == 0 else 0)
+            # patch_size = min(min(lr_image.shape[:2]), 4096//scale) # take the minimum of the two dimensions - call it min_dim, the minimum of min_dim and the max supported upscale resolution divided by the scale
+            print("patch_size, pad_size", patch_size, pad_size)
 
             patches, p_shape = split_image_into_overlapping_patches(
                 lr_image, patch_size=patch_size, padding_size=pad_size
@@ -427,75 +433,78 @@ def scale_image(
         log_file,
     )
     if generator:
-        # try:
-        gc.collect()
-        torch.cuda.empty_cache()
-        torch.cuda.reset_max_memory_allocated()
-        if master:
-            master.print_export_logs(f"Upscaling {im_name}")
-        with torch.inference_mode():
-            with torch.autocast(
-                device_type=export_config["device"],
-                dtype=confref.upscale_precision_levels[export_config["device"]][
-                    export_config["upscale_precision"]
-                ][1],
-            ):
-                # upscaling color
-                if img.upscale_color_with_generator:
-                    if ExportConfig.split_large_image:
-                        img.color_channels = handle_patch_upscaling(
-                            img.color_channels, "color", generator, export_config
-                        )
-                    if (not ExportConfig.split_large_image) or (
-                        not confref.split_color
-                    ):
-                        img.color_channels = generator(
-                            confref.inference_transform(image=img.color_channels)[
-                                "image"
-                            ]
-                            .unsqueeze(0)
-                            .to(export_config["device"])
-                        )[0]
+        try:
+            gc.collect()
+            torch.cuda.empty_cache()
+            torch.cuda.reset_max_memory_allocated()
+            if master:
+                master.print_export_logs(f"Upscaling {im_name}")
+            with torch.inference_mode():
+                with torch.autocast(
+                    device_type=export_config["device"],
+                    dtype=confref.upscale_precision_levels[export_config["device"]][
+                        export_config["upscale_precision"]
+                    ][1],
+                ):
+                    # upscaling color
+                    if img.upscale_color_with_generator:
+                        if ExportConfig.split_large_image:
+                            img.color_channels = handle_patch_upscaling(
+                                img.color_channels, "color", generator, export_config
+                            )
+                        if (not ExportConfig.split_large_image) or (
+                            not confref.split_color
+                        ):
+                            img.color_channels = generator(
+                                confref.inference_transform(image=img.color_channels)[
+                                    "image"
+                                ]
+                                .unsqueeze(0)
+                                .to(export_config["device"])
+                            )[0]
 
-                # upscaling alpha
-                if img.upscale_alpha_with_generator:
-                    if ExportConfig.split_large_image:
-                        img.alpha = handle_patch_upscaling(
-                            img.alpha, "alpha", generator, export_config
-                        )
-                    if (not ExportConfig.split_large_image) or (
-                        not confref.split_alpha
-                    ):
-                        img.alpha = generator(
-                            confref.inference_transform(image=img.alpha)["image"]
-                            .unsqueeze(0)
-                            .to(export_config["device"])
-                        )[0]
-        img.handle_gamma_correction(1 / export_config["gamma_adjustment"])
-        img.recombine_channels()
+                    # upscaling alpha
+                    if img.upscale_alpha_with_generator:
+                        if ExportConfig.split_large_image:
+                            img.alpha = handle_patch_upscaling(
+                                img.alpha, "alpha", generator, export_config
+                            )
+                        if (not ExportConfig.split_large_image) or (
+                            not confref.split_alpha
+                        ):
+                            img.alpha = generator(
+                                confref.inference_transform(image=img.alpha)["image"]
+                                .unsqueeze(0)
+                                .to(export_config["device"])
+                            )[0]
+            img.handle_gamma_correction(1 / export_config["gamma_adjustment"])
+            img.recombine_channels()
 
-        # except Exception as e:
-        #     if type(e) == torch.cuda.OutOfMemoryError:
-        #         write_log_to_file(
-        #             "ERROR",
-        #             f"Could not process {im_name}. There isn't enough video memory to allocate for processing the image. Try a smaller scale, or scale using CPU as the device settings \n (path: {img.trg_path}).",
-        #             log_file,
-        #         )
-        #     else:
-        #         write_log_to_file(
-        #             "ERROR",
-        #             f"Could not process {im_name}. The program ran into an unhandled error. \n (path: {img.trg_path})."
-        #             f"ERROR: \n\n{e}\n\n",
-        #             log_file,
-        #         )
-        #     warning_mssg = True if master else False
+        except Exception as e:
+            if type(e) == torch.cuda.OutOfMemoryError:
+                write_log_to_file(
+                    "ERROR",
+                    f"Could not process {im_name}. There isn't enough video memory to allocate for processing the image. Use the Split and Recombine Large Images feature , or scale using CPU as the device settings \n (path: {img.trg_path}).",
+                    log_file,
+                )
+            else:
+                write_log_to_file(
+                    "ERROR",
+                    f"Could not process {im_name}. The program ran into an unhandled error. \n (path: {img.trg_path})."
+                    f"ERROR: \n\n{e}\n\n",
+                    log_file,
+                )
+            warning_mssg = True if master else False
     # Downscale Color+Alpha
     else:
+        if scale == 0.5:
+            if img.upscale_alpha_with_generator:
+                img.alpha = handle_downscaling(image=img.alpha)
+            if img.upscale_color_with_generator:
+                img.color_channels = handle_downscaling(image=img.color_channels)
         img.handle_gamma_correction(
             1 / export_config["gamma_adjustment"]
         ).recombine_channels()
-        if scale == 0.5:
-            img.image = handle_downscaling(image=img.image)
 
 
 def export_images(
@@ -573,110 +582,116 @@ def export_images(
             )
 
         for i in export_indices:
-            # try:
-            count += 1
-            im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-            fp, step = os.path.join(im_path, im_name), "reading image."
-            sub_time_start = time.time()
+            try:
+                count += 1
+                im_name, im_path = cache_copy[0][i], cache_copy[1][i]
+                fp, step = os.path.join(im_path, im_name), "reading image."
+                sub_time_start = time.time()
 
-            if master:
-                master.print_image_index(f"Processed/Total: {count-1}/{tot_images}")
-            if not master and verbose:
-                print(f"\nAttempting to process file:\n\t {fp}\n")
-
-            if master:
-                master.print_export_logs(f"Preprocessing: {im_name}")
-
-            step = "setting up image for processing"
-            img = ImageContainer(
-                img_index=i,
-                src_path=im_path,
-                trg_path=export_config["single_export_location"]
-                if not export_config["export_to_original"]
-                else im_path,
-                img_name=im_name,
-                **export_config,
-            )
-
-            step = "attempting to scale linearly."
-            img.check_all_values_equivalent()
-            step = "attempting to split color and alpha channels for separate processing."
-            img.split_image()
-            step = "attempting to correct gamma."
-            img.handle_gamma_correction(export_config["gamma_adjustment"])
-            step = "converting the data type before upscaling."
-            img.convert_datatype(input=True)
-            step = "attempting to upscale the image with the chosen model."
-            scale_image(
-                master=master,
-                generator=generator,
-                export_config=export_config,
-                im_name=im_name,
-            )  # recombines color and alpha (if any) channel into a single array
-
-            step = (
-                "attempting to reconvert the back to the chosen export color depth."
-            )
-            # pixel values adjustments based on export color depth, export color space and gamma correction settings
-            img.convert_datatype(input=False)
-            step = "attempting to process export color mode."
-            # write color mode (RGB, RGBA, L, LA)
-            # exporting images as .dds forced RGBA
-            img.image = img.handle_write_channel_mode(img.image)
-
-            step = "applying the dds mip level workaround for the .dds image export format."
-            # dds mipmap fix
-            if export_config["export_format"] == "dds":
-                img.apply_dds_mipmap_fix()
-
-            # noise
-            if (export_config["noise_level"] != 0.0) and (
-                not img.linear_upscale_all_channels  # if the entire image is a single value, no point in noisifying
-            ):
                 if master:
-                    master.print_export_logs(f"Processing noise for: {im_name}")
-                step = "attempting to process color mode for noisy image."
-                img.noisy_copy = img.handle_write_channel_mode(img.noisy_copy)
-                step = "attempting to add noise."
-                img.handle_noise()
+                    master.print_image_index(f"Processed/Total: {count-1}/{tot_images}")
+                if not master and verbose:
+                    print(f"\nAttempting to process file:\n\t {fp}\n")
 
-            step = "attempting reverse color channels."
+                if master:
+                    master.print_export_logs(f"Preprocessing: {im_name}")
 
-            # channel order for wand vs. open cv write functions
-            img.handle_channel_order()
+                step = "setting up image for processing"
+                img = ImageContainer(
+                    img_index=i,
+                    src_path=im_path,
+                    trg_path=export_config["single_export_location"]
+                    if not export_config["export_to_original"]
+                    else im_path,
+                    img_name=im_name,
+                    **export_config,
+                )
 
-            step = "attempting to save image."
-            # write
-            if master:
-                master.print_export_logs(f"Saving: {im_name}")
-            img.write_image(master=master, verbose=verbose)
+                step = "attempting to scale linearly."
+                img.check_all_values_equivalent()
+                step = (
+                    "attempting to split color and alpha channels for separate processing."
+                )
+                img.split_image()
+                step = "attempting to correct gamma."
+                img.handle_gamma_correction(export_config["gamma_adjustment"])
+                step = "converting the data type before upscaling."
+                img.convert_datatype(input=True)
+                step = "attempting to upscale the image with the chosen model."
+                scale_image(
+                    master=master,
+                    generator=generator,
+                    export_config=export_config,
+                    im_name=im_name,
+                )  # recombines color and alpha (if any) channel into a single array
 
-            if master:
-                progress += step_size
-                prog_bar.set(value=progress)
+                step = "attempting to reconvert the back to the chosen export color depth."
+                # pixel values adjustments based on export color depth, export color space and gamma correction settings
+                img.convert_datatype(input=False)
+                step = "attempting to process export color mode."
+                # write color mode (RGB, RGBA, L, LA)
+                # exporting images as .dds forced RGBA
+                img.image = img.handle_write_channel_mode(img.image)
+
+                step = "applying the dds mip level workaround for the .dds image export format."
+                # dds mipmap fix
+                if export_config["export_format"] == "dds":
+                    img.apply_dds_mipmap_fix()
+
+                # noise
+                if (
+                    (not export_config["noise_level"] == 0.0)
+                    and (
+                        not img.linear_upscale_all_channels  # if the entire image is a single value, no point in noisifying
+                    )
+                    and (
+                        not img.upscale_factor == 0.5
+                    )  # does not support adding noise while downscaling
+                ):
+                    if master:
+                        master.print_export_logs(f"Processing noise for: {im_name}")
+                    step = "attempting to process color mode for noisy image."
+                    img.noisy_copy = img.handle_write_channel_mode(img.noisy_copy)
+                    step = "attempting to add noise."
+                    img.handle_noise()
+
+                step = "attempting reverse color channels."
+
+                # channel order for wand vs. open cv write functions
+                img.handle_channel_order()
+
+                step = "attempting to save image."
+                # write
+                if master:
+                    master.print_export_logs(f"Saving: {im_name}")
+                img.write_image(master=master, verbose=verbose)
+
+                if master:
+                    progress += step_size
+                    prog_bar.set(value=progress)
+                    write_log_to_file(
+                        "INFO",
+                        f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
+                        log_file,
+                    )
+                    if task.stopped():
+                        break
+                split, img, warn_mssg, confref.split_color, confref.split_alpha = (
+                    False,
+                    None,
+                    False,
+                    False,
+                    False,
+            )  # reset global variables related to the current image
+            except:
+                not_processed.append((im_name, im_path))
                 write_log_to_file(
-                    "INFO",
-                    f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
+                    "ERROR",
+                    f"Ran into an issue while {step}: {im_name} ",
                     log_file,
                 )
-                if task.stopped():
-                    break
-            split, img, warn_mssg, confref.split_color, confref.split_alpha = (
-                False,
-                None,
-                False,
-                False,
-                False,
-            )  # reset global variables related to the current image
-            # except:
-            #     not_processed.append((im_name, im_path))
-            #     write_log_to_file(
-            #         "ERROR",
-            #         f"Ran into an issue while {step}: {im_name} ",
-            #         log_file,
-            #     )
-            #     warning_mssg = True if master else False
-            #     continue
+                warning_mssg = True if master else False
+                continue
 
         tot_time = round(time.time() - start_time, 2)
         write_log_to_file(
@@ -690,15 +705,28 @@ def export_images(
             f"The following images were not written {not_processed}.",
             log_file,
         )
+
+        # clear GPU memory after export loop finishes
+        torch.cuda.empty_cache()
+
+        # end export task (kill thread)
         task.stop()
+        # closing the GUI master frame writes the information on the buffer to the log file due to the overridder .destroy() method
+        # the CLI version requires the log file to be manually closed after the export loop
+        if not master:
+            log_file.close()  # global TextIOWrapper file needs to be closed manually since the write_to_lof_file function doesn't close it
         # sleep before removing progress bar
-        time.sleep(0.5)
+        if master:
+            time.sleep(0.5)
+
+    # reset GUI printout text
     if master:
         master.print_export_logs(f"")
         master.print_image_index(f"")
         prog_bar.grid_forget()
         stop_export_button.grid_forget()
 
+    # warn user with a prompt that some files were not processed if some files fail to export
     if warning_mssg:
         warn_mssg = (
             "Some files were not processed. Please refer to the latest log file."
@@ -713,12 +741,11 @@ def export_images(
                 icon="warning",
                 option_1="Ok",
             )
+    # replot export button for another export task if desired
     if master:
         master.export_sub_frame.export_button.grid(
             row=1, column=0, sticky="ew", padx=85, pady=10
         )
-    if not master:
-        log_file.close()  # global TextIOWrapper file needs to be closed manually since the write_to_lof_file function doesn't close it
 
 
 def copy_files(export_indices: Union[List[int], None] = None, copy_location: str = ""):

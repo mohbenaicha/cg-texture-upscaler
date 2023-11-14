@@ -63,7 +63,7 @@ class ExportConfigSchema(BaseModel):
     color_space: str
     export_color_depth: str
     split_large_image: bool
-    padding_size: float
+    patch_size: int
 
 class GeneratorArgumentSchema(BaseModel):
     scale: int

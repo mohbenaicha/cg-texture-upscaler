@@ -1,4 +1,4 @@
-from typing import List, Dict, Tuple, Union, Any
+from typing import List, Dict, Tuple, Union, Callable
 from enum import Enum
 import numpy as np
 import torch
@@ -48,7 +48,6 @@ class ConfigReference:
     mipmap_levels: List[str] = ["max", "75%", "50%", "25%", "none"]
     available_export_formats: List[str] = ["tga", "dds", "bmp", "exr", "png", "jpg"]
     limit_vram_value = 1.0
-    vram_req_map: Dict[str, float] = {""}
     supports_mipmaps: Dict[str, bool] = {
         "dds": True,
         "tga": False,
@@ -75,7 +74,7 @@ class ConfigReference:
         "tga": ("none", "rle"),
         "exr": tuple(EXR_COMPRESSION_TYPES.__members__.keys()),
     }
-    range_compression_map: Dict[str, Dict[str, Union[Tuple, int]]] = {
+    range_compression_map: Dict[str, Dict[str, Union[Tuple[int], int]]] = {
         "png": {"range": (0, 9), "step": 1},
         "jpg": {"range": (0, 100), "step": 1},
     }
@@ -83,8 +82,8 @@ class ConfigReference:
         "png": ("RGBA", "RGB", "L"),
         "jpg": ("RGB", "L"),
         "bmp": ("RGBA", "RGB", "L"),
-        "dds": ("RGBA",),
-        "tga": ("RGBA", "RGB", "L"),
+        "dds": ("RGBA", "RGB"),
+        "tga": ("RGBA", "RGB"),
         "exr": ("RGBA", "RGB", "L"),
     }
     supported_color_depth: List[str] = ["8", "16", "32"]  # bits per channel
@@ -135,7 +134,7 @@ class ConfigReference:
             ToTensorV2(),
         ]
     )
-    supported_dtypes: dict[str, Any] = {
+    supported_dtypes: dict[str, Union[type, torch.dtype]] = {
         "array": {"uint8": np.uint8, "uint16": np.uint16, "float32": np.float32},
         "tensor": {
             "uint8": torch.uint8,
@@ -152,6 +151,12 @@ class ConfigReference:
         "float32:uint8",
         "uint16:uint8",
     )
+    split_sizes: dict[str,Tuple[str, int]] = {
+        "1": ("small", 1024*1024),
+        "2": ("medium", 2048*2048),
+        "3": ("large", 4096*4096),
+        "4": ("extra large", 8192*8192)
+    }
 
 
 class SearchConfig:
@@ -159,6 +164,7 @@ class SearchConfig:
     last_used_dir_or_file: str = ""
     recursive: bool = False
     illegal_search_characters: set = set('*:?<>"|/\\')
+    legal_filter_by_dimension_characters: set = set("1234567890<>=!,")
     supported_file_types: Tuple[Tuple[str, str]] = (
         ("DirectDraw Surface", "*.dds"),
         ("TARGA", "*.tga"),
@@ -175,6 +181,15 @@ class SearchConfig:
     num_not_filters: int = 4
     go_to_file_name: Union[str, None] = ""
     copy_location: Union[str, None] = ""
+    dimension_filter_string: str = "2,2,>="
+    dimension_filter_operator_map: dict[str, Callable] = {
+        "==": lambda a, b: (a[0] == b[0]) and (a[1] == b[1]),
+        ">=": lambda a, b: (a[0] >= b[0]) and (a[1] >= b[1]),
+        "<=": lambda a, b: (a[0] <= b[0]) and (a[1] <= b[1]),
+        ">": lambda a, b: (a[0] > b[0]) and (a[1] > b[1]),
+        "<": lambda a, b: (a[0] < b[0]) and (a[1] < b[1]),
+        "!=": lambda a, b: (a[0] != b[0]) and (a[1] != b[1])
+    }
 
 
 class ExportConfig:
@@ -200,7 +215,7 @@ class ExportConfig:
     gamma_adjustment: float = 1.0
     # TODO: implement
     split_large_image: bool = True
-    padding_size: float = 0.1
+    patch_size: str = "3"
 
 
 class GUIConfig:
@@ -238,5 +253,6 @@ class GUIConfig:
 class TechnicalConfig:
     gui_version: str = "0.0.6"
     cli_version: str = "0.0.5"
-    app_display_name: str = "CG Texture Upscaler"
-    app_cli_name: str = "CG Texture Upscaler CLI"
+    app_display_name: str = "CG Texture Upscaler and Utility" 
+    app_cli_name: str = "CG Texture Upscaler and Utility"#"CG Texture Upscaler CLI"
+    app_author: str = "Mohamed Benaicha" 

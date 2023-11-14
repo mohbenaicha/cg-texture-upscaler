@@ -22,15 +22,11 @@ decrease_gui_scale = "  Decrease the scale of GUI elements (experimental)  "
 # export options frame
 
 scale =             (
-                    " Scale the width and heigth of the     \n"
-                    " texture(s) by the chosen scale.       \n"  
-                    " i.e. a texture with a resolution of   \n"   
-                    " [512x256] with a scale of 2x because  \n" 
-                    " a [1024x1024] resolution image        \n"
-                    " Engine-supported texture                "
+                    " Scale the width and heigth of the       \n"
+                    " selected texture(s) by the chosen scale.\n"
 )
 
-format =            "   Format in which to save selected the images  "
+format =            "   Format in which to save the selected images  "
 
 compression =       (
                      " TGA: RLE, None                                                                                      \n"
@@ -49,9 +45,9 @@ png_compression =   (
 )
 
 jpg_compression =   (
-                    " JPG  quality:                                                 \n"
-                    " 1 results in the lowest quality but also size of the image    \n"
-                    " 100 results in the highest quality but also size of the image   "
+                    " JPG  quality:                                                         \n"
+                    " 1 results in the lowest quality but also smaller size of the image    \n"
+                    " 100 results in the highest quality but also largest size of the image   "
 )
 
 denoise =          (" Level of noise to add. Noise is added from the original  \n"
@@ -68,7 +64,7 @@ prefix =           (" Add a prefix to each file name:  \n   "
 suffix =            (" Add a suffix to each file name:   \n"    
                     " filename[suffix].extension        \n")
 
-numbered_checkbox = ("  Add a unique number to each file name  \n"
+numbered_checkbox = (" Add a unique number to each file name   \n"
                      " to avoid overwriting:                   \n"
                      " ground_texture_[uniquenumber].extension \n"  
                      " ground_texture_[uniquenumber].extension \n" 
@@ -110,36 +106,36 @@ browsermode =       (" Selecting an image in the listbox    \n"
                      " arrow keys will automatically open   \n"
                      " it in the image viewer.                ")
 
-device =           ("  The device to use for upscaling                  \n " 
+device =           (" The device to use for upscaling                   \n " 
                     " the selected texture(s). CPU upscaling            \n "
                     " is far slower than GPU upscaling. Refer           \n "
                     " to the device guide for setting up GPU upscaling.    ")
 
-color_space =      (" NOTE: In and Out mean VERY DIFFERENT things:    \n\n"
-                    " Linear In and sRGB In are guidance you give     \n"
-                    " to the application based on the way your images \n"
-                    " are written. The applicaion cannot determine    \n"
-                    " on its own.                                     \n\n"
-                    " Linear Out and sRGB Out are handled by the      \n"
-                    " so if you want the upscaled image written in    \n"
-                    " in linear RGB colors, select Linear Out and     \n"
-                    " the like if you want them written in sRGB.      \n"
+color_space =      (" NOTE: In and Out mean VERY DIFFERENT things:              \n\n"
+                    " Linear In and sRGB In are guidance you give                 \n"
+                    " to the application based on the way your images             \n"
+                    " are written. The applicaion cannot determine                \n"
+                    " that on its own.                                          \n\n"
+                    " Linear Out and sRGB Out are handled by the application      \n"
+                    " so if you want the upscaled image written in                \n"
+                    " in linear RGB colors, select Linear Out and                 \n"
+                    " the like if you want them written in sRGB.                  \n"
                     
 )
 gamma_adjustment = (
                     " If your images are written with a gamma that isn't 1.0    \n"
                     " and the upscaled images look off, adjust this setting.    \n"
 )
-color_mode =       (" Export images as RGB or greyscale images.     \n "
-                    " Note: DDS formats do no support the greyscale \n "
-                    " color mode.                                   \n ")
+color_mode =       (" Export images as RGB or greyscale images. \n "
+                    " Note: DDS, TGA BMP formats do no support  \n "
+                    " the greyscale color mode.                 \n ")
 
-color_depth =       (" The the processed images will be \n"
+color_depth =       (" The processed images will be     \n"
                      " exported based on the chosen bit \n" 
                      " depth, or based on the highest   \n" 
                      " supported bit depth for the      \n"
-                     " selected chosen format.          \n" 
-                     " Per channel pixel depth:         \n"
+                     " chosen format.                   \n" 
+                     " Per channel color depth:         \n"
                      " PNG: 8, 16 \n"
                      " JPG: 8 \n"
                      " TGA: 8 \n"
@@ -153,10 +149,10 @@ upscale_precision = (" Recommended: normal precision. High \n"
                      " process and doesn't split images to \n"
                      " avoid running out of video memory.    ")
 
-split_large_image = (" (Recommended) If an image is too large \n"
-                     " for your video memory, it will be split\n" 
-                     " into individual images, upscaled, then \n"
-                     " he two new images are recombined.        ")
+split_large_image = (" (Recommended) If an image is too large  \n"
+                     " for your video memory, it will be split \n"
+                     " into individual images, upscaled, then  \n"
+                     " the individual new images are recombined. ")
 pad_size =         (" Recommended: 10%. The size of the margines   \n" 
                     " to use when splitting the image to be        \n"
                     " processed a larger pad size results in a     \n"

@@ -2,14 +2,14 @@ import os
 import tkinter as tk
 import customtkinter as ctk
 from PIL import Image
-import cv2
+import cv2, numpy as np
 from threading import Thread
 from typing import List, Tuple, Union
 from gui.tooltips import tooltip_text as ttt
 from gui.tooltips import Hovertip_Frame
 from gui.message_box import CTkMessagebox
-from gui.frames.top_level_frames import ImageWindow, GoToWindow, CopyFilesWindow
-from app_config.config import SearchConfig, GUIConfig, ExportConfig
+from gui.frames.top_level_frames import ImageWindow, GoToWindow, CopyFilesWindow, FilterDimensionsWindow
+from app_config.config import SearchConfig, GUIConfig, ConfigReference
 from utils.export_utils import write_log_to_file
 from utils.events import print_to_frame
 from gui.ctk_fonts import error_font, buttons_font  # , main_lb_items_font
@@ -434,8 +434,6 @@ class TkListbox(ctk.CTkFrame):
             or_true = any([filter_txt in file for filter_txt in or_filters])
             not_true = any([filter_txt in file for filter_txt in not_filters])
 
-            ########
-
             if (
                 (
                     and_true and not len_and == 0 and not not_true
@@ -453,6 +451,44 @@ class TkListbox(ctk.CTkFrame):
                 del imcache[0][keep_idx]
                 del imcache[1][keep_idx]
 
+        if obj:
+            obj.remove_items(None)
+            obj.configure_listbox_variable(listvariable=imcache[0])
+
+    @classmethod
+    def filter_by_dimension(
+        cls,
+        obj,
+        dimensions: Tuple[int],
+        operator: str,
+        source_list: str,
+    ):
+        keep_idx = 0
+        remaining = len(imcache[0])
+        while remaining > keep_idx:
+            fn = imcache[0][keep_idx]
+            ffp = os.path.join(imcache[1][keep_idx], fn)
+            if fn[-3:] in ConfigReference.available_export_formats:
+                img_obj = (
+                    cv2.imread(ffp, cv2.IMREAD_UNCHANGED)
+                    if imcache[0][keep_idx] in ConfigReference.opencv_formats
+                    else np.array(Image.open(fp=ffp))
+                )
+                try:
+                    cond = SearchConfig.dimension_filter_operator_map[operator](
+                        (img_obj.shape[1], img_obj.shape[0]), # current image's dimension
+                        (dimensions[0], dimensions[1]), # user's specified dimensions
+                    )
+                    
+                except:  # when the images dimensions can't be processed skip the image
+                    cond = False
+
+                if cond:
+                    keep_idx += 1
+                else:
+                    remaining -= 1
+                    del imcache[0][keep_idx]
+                    del imcache[1][keep_idx]
         if obj:
             obj.remove_items(None)
             obj.configure_listbox_variable(listvariable=imcache[0])
@@ -519,6 +555,11 @@ class TkListbox(ctk.CTkFrame):
         self.listbox.popup_menu.add_command(
             label="Find (CTRL + F)",
             command=lambda: self.go_to_command(None),
+            foreground="white",
+        )
+        self.listbox.popup_menu.add_command(
+            label="Filter by Image Dimensions",
+            command=lambda: self.filter_dimension_dialogue_window(self),
             foreground="white",
         )
         self.listbox.popup_menu.add_command(
@@ -593,7 +634,15 @@ class TkListbox(ctk.CTkFrame):
         image_to_open = os.path.join(imcache[1][idx], imcache[0][idx])
         try:
             if image_to_open[-3:] == "exr":
-                raw_img = Image.fromarray((cv2.cvtColor(cv2.imread(image_to_open, cv2.IMREAD_UNCHANGED), cv2.COLOR_BGRA2RGBA)*255).astype('uint8'))
+                raw_img = Image.fromarray(
+                    (
+                        cv2.cvtColor(
+                            cv2.imread(image_to_open, cv2.IMREAD_UNCHANGED),
+                            cv2.COLOR_BGRA2RGBA,
+                        )
+                        * 255
+                    ).astype("uint8")
+                )
             else:
                 raw_img = Image.open(image_to_open)
         except Exception as e:
@@ -640,6 +689,11 @@ class TkListbox(ctk.CTkFrame):
 
         self.toplevel_window.attributes("-topmost", 1)
         # self.toplevel_window.focus()
+    
+    def filter_dimension_dialogue_window(self, value):
+        self.toplevel_window = FilterDimensionsWindow(lb_frame=self)
+        self.toplevel_window.attributes("-topmost", 1)
+        self.toplevel_window.focus()
 
     def go_to_command(self, value):
         self.toplevel_window = GoToWindow(main_lb=self)

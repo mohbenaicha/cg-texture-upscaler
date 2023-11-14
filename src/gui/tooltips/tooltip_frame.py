@@ -12,7 +12,7 @@ from tkinter import *
 class TooltipBase:
     """abstract base class for tooltips"""
 
-    def __init__(self, anchor_widget):
+    def __init__(self, anchor_widget, topmost):
         """Create a tooltip.
 
         anchor_widget: the widget next to which the tooltip will be shown
@@ -21,6 +21,7 @@ class TooltipBase:
         """
         self.anchor_widget = anchor_widget
         self.tipwindow = None
+        self.topmost = topmost
 
     def __del__(self):
         self.hidetip()
@@ -30,6 +31,8 @@ class TooltipBase:
         if self.tipwindow:
             return
         self.tipwindow = tw = Toplevel(self.anchor_widget, background="Blue")
+        if self.topmost:
+            self.tipwindow.attributes("-topmost", 1)
         # show no border on the top level window
         tw.wm_overrideredirect(1)
         try:
@@ -89,7 +92,7 @@ class TooltipBase:
 class OnHoverTooltipBase(TooltipBase):
     """abstract base class for tooltips, with delayed on-hover display"""
 
-    def __init__(self, anchor_widget, hover_delay=1000):
+    def __init__(self, anchor_widget, hover_delay=1000, topmost = False):
         """Create a tooltip with a mouse hover delay.
 
         anchor_widget: the widget next to which the tooltip will be shown
@@ -99,7 +102,7 @@ class OnHoverTooltipBase(TooltipBase):
         e.g. after hovering over the anchor widget with the mouse for enough
         time.
         """
-        super(OnHoverTooltipBase, self).__init__(anchor_widget)
+        super(OnHoverTooltipBase, self).__init__(anchor_widget, topmost)
         self.hover_delay = hover_delay
 
         self._after_id = None
@@ -151,9 +154,10 @@ class OnHoverTooltipBase(TooltipBase):
 class Hovertip_Frame(OnHoverTooltipBase):
     "A tooltip that pops up when a mouse hovers over an anchor widget."
 
-    def __init__(self, anchor_widget, text, bg_color, text_color, hover_delay=1000):
+    def __init__(self, anchor_widget, text, bg_color, text_color, hover_delay=1000, image=None, topmost:bool = False):
         self.bg_color = bg_color
         self.text_color = text_color
+        self.topmost = topmost
         """Create a text tooltip with a mouse hover delay.
 
         anchor_widget: the widget next to which the tooltip will be shown
@@ -163,8 +167,9 @@ class Hovertip_Frame(OnHoverTooltipBase):
         e.g. after hovering over the anchor widget with the mouse for enough
         time.
         """
-        super(Hovertip_Frame, self).__init__(anchor_widget, hover_delay=hover_delay)
+        super(Hovertip_Frame, self).__init__(anchor_widget, hover_delay=hover_delay, topmost=self.topmost)
         self.text = text
+        self.image = image
 
     def showcontents(self):
         label = Label(
@@ -175,6 +180,7 @@ class Hovertip_Frame(OnHoverTooltipBase):
             fg=self.text_color,
             relief=SOLID,
             borderwidth=0,
+            image=self.image
         )
         label.pack()
 

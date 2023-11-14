@@ -46,9 +46,7 @@ class ImageContainer:
         self.numbering: Optional[str] = kwargs.get("numbering", None)
         self.prefix: Optional[str] = kwargs.get("prefix", None)
         self.suffix: Optional[str] = kwargs.get("suffix", None)
-
         self.flag_export_to_original: bool = kwargs.get("export_to_original", False)
-
         self.opencv_read_args: List[int] = [cv2.IMREAD_UNCHANGED]
 
         self.write_compression: Optional[str] = kwargs.get(
@@ -91,10 +89,6 @@ class ImageContainer:
             # get color channels from the noisy copy since linear-sRGB transformations are not
             # applied to alpha channels
             self.noisy_copy = np.copy(self.image)
-            if "Linear" in self.color_space and "sRGB" in self.color_space:
-                self.noisy_copy = self.output_dtype_mapping[
-                    f"{str(self.noisy_copy.dtype)}:float32"
-                ](channels=self.noisy_copy)
 
             if self.mode == "RGBA":  # RGB + Alpha
                 temp = np.copy(self.noisy_copy)[..., :3]
@@ -102,14 +96,6 @@ class ImageContainer:
                 temp = np.copy(self.noisy_copy)[..., :1]
             else:  # RGB or Greyscale
                 temp = np.copy(self.noisy_copy)[..., :]
-
-            if "Linear" in self.color_space and "sRGB" in self.color_space:
-                temp = np.vectorize(
-                    {
-                        "Linear In/ sRGB Out": self.linear_to_sRGB,
-                        "sRGB In/ Linear Out": self.sRGB_to_linear,
-                    }[self.color_space]
-                )(temp)
 
             # concatenate tranformed color channels with alpha channel TODO: is there a better way to avoid repeating the if/else statements
             if self.mode == "RGBA":
@@ -125,8 +111,17 @@ class ImageContainer:
             del temp
 
             self.noisy_copy = self.output_dtype_mapping[
-                f"{str(self.noisy_copy.dtype)}:{self.trg_image_dtype}"
+                f"{str(self.noisy_copy.dtype)}:{self.trg_image_dtype if self.export_format != 'exr' else 'float32'}"
             ](channels=self.noisy_copy)
+
+            if "Linear In" in self.color_space:
+                self.noisy_copy = self.output_dtype_mapping[
+                    f"{self.noisy_copy.dtype}:float32"
+                ](channels=self.noisy_copy)
+                self.noisy_copy = np.vectorize(self.sRGB_to_linear)(
+                    self.noisy_copy
+                ).astype(self.noisy_copy.dtype)
+
             if self.mode == "L":
                 self.noisy_copy = np.expand_dims(self.noisy_copy, 2)
 
@@ -169,7 +164,7 @@ class ImageContainer:
         """
         self.upscale_color_with_generator, self.upscale_alpha_with_generator = (
             True
-            if (self.upscale_factor in [2, 4] and self.proceed_with_split)
+            if (self.upscale_factor in [2, 4, 0.5] and self.proceed_with_split)
             else False,
             False,  # will handle separately
         )
@@ -185,7 +180,7 @@ class ImageContainer:
                 if (
                     type(self.alpha) == np.ndarray
                     and "A" in self.export_mode
-                    and self.upscale_factor in [2, 4]
+                    and self.upscale_factor in [2, 4, 0.5]
                 )
                 else False
             )
@@ -310,72 +305,79 @@ class ImageContainer:
         combined into a single channel based on a fixed weighting
         """
         t_alpha, t_color = type(self.alpha), type(self.color_channels)
-        if not t_alpha == type(None):
-            if len(self.alpha.shape) == 2:
+        if not self.upscale_factor == 0.5:
+            if not t_alpha == type(None):
+                if len(self.alpha.shape) == 2:
+                    self.alpha = (
+                        np.expand_dims(self.alpha, axis=2)
+                        if t_alpha == np.ndarray
+                        else self.alpha.unsqueeze(dim=2)
+                    )
+            if len(self.color_channels.shape) == 2:
+                self.color_channels = (
+                    np.expand_dims(self.color_channels, axis=2)
+                    if t_color == np.ndarray
+                    else self.color_channels.unsqueeze(dim=2)
+                )
+
+            if self.upscale_alpha_with_generator:
+                if not type(self.alpha) == type(None):
+                    alpha_dims = len(self.alpha.shape)
+
+                if alpha_dims == 2:
+                    self.alpha = self.alpha.unsqueeze(0)
+                if confref.split_alpha and t_alpha == torch.Tensor:
+                    self.alpha = self.alpha.permute(2, 0, 1)
+
                 self.alpha = (
-                    np.expand_dims(self.alpha, axis=2)
-                    if t_alpha == np.ndarray
-                    else self.alpha.unsqueeze(dim=2)
+                    self.alpha[0] * (0.2989)
+                    + self.alpha[1] * (0.5870)
+                    + self.alpha[2] * (0.1140)
+                ).unsqueeze(0)
+                if confref.split_alpha and t_alpha == torch.Tensor:
+                    self.alpha.permute(2, 0, 1)
+            else:
+                if t_alpha == np.ndarray:
+                    temp, self.alpha = np.transpose(self.alpha, axes=(2, 0, 1)), None
+                    self.alpha, temp = temp, None
+
+            if self.upscale_color_with_generator:
+                if confref.split_color and t_color == torch.Tensor:
+                    self.color_channels = self.color_channels.permute(2, 0, 1)
+            else:
+                if t_color == np.ndarray:
+                    temp, self.color_channels = (
+                        np.transpose(self.color_channels, axes=(2, 0, 1)),
+                        None,
+                    )
+                    self.color_channels, temp = temp, None
+            if t_alpha == torch.Tensor:
+                self.alpha = (
+                    self.alpha.detach().cpu()
+                    if self.device == "cuda"
+                    else self.alpha.to(dtype=torch.float32)
                 )
-        if len(self.color_channels.shape) == 2:
-            self.color_channels = (
-                np.expand_dims(self.color_channels, axis=2)
-                if t_color == np.ndarray
-                else self.color_channels.unsqueeze(dim=2)
-            )
-
-        if self.upscale_alpha_with_generator:
-            if not type(self.alpha) == type(None):
-                alpha_dims = len(self.alpha.shape)
-
-            if alpha_dims == 2:
-                self.alpha = self.alpha.unsqueeze(0)
-            if confref.split_alpha and t_alpha == torch.Tensor:
-                self.alpha = self.alpha.permute(2, 0, 1)
-
-            self.alpha = (
-                self.alpha[0] * (0.2989)
-                + self.alpha[1] * (0.5870)
-                + self.alpha[2] * (0.1140)
-            ).unsqueeze(0)
-            if confref.split_alpha and t_alpha == torch.Tensor:
-                self.alpha.permute(2, 0, 1)
-        else:
-            if t_alpha == np.ndarray:
-                temp, self.alpha = np.transpose(self.alpha, axes=(2, 0, 1)), None
-                self.alpha, temp = temp, None
-
-        if self.upscale_color_with_generator:
-            if confref.split_color and t_color == torch.Tensor:
-                self.color_channels = self.color_channels.permute(2, 0, 1)
-        else:
-            if t_color == np.ndarray:
-                temp, self.color_channels = (
-                    np.transpose(self.color_channels, axes=(2, 0, 1)),
-                    None,
+                self.alpha = self.alpha.numpy()
+            if t_color == torch.Tensor:
+                self.color_channels = (
+                    self.color_channels.detach().cpu()
+                    if self.device == "cuda"
+                    else self.color_channels.to(dtype=torch.float32)
                 )
-                self.color_channels, temp = temp, None
-        if t_alpha == torch.Tensor:
-            self.alpha = (
-                self.alpha.detach().cpu()
-                if self.device == "cuda"
-                else self.alpha.to(dtype=torch.float32)
-            )
-            self.alpha = self.alpha.numpy()
-        if t_color == torch.Tensor:
-            self.color_channels = (
-                self.color_channels.detach().cpu()
-                if self.device == "cuda"
-                else self.color_channels.to(dtype=torch.float32)
-            )
-            self.color_channels = self.color_channels.numpy()
+                self.color_channels = self.color_channels.numpy()
 
         if not t_alpha == type(None):
-            self.image = np.concatenate((self.color_channels, self.alpha), axis=0)
+            self.image = np.concatenate(
+                (self.color_channels, self.alpha),
+                axis=(0 if self.upscale_factor != 0.5 else 2),
+            )
         else:
             self.image = self.color_channels
 
-        temp, self.image = self.image.transpose(1, 2, 0), None
+        temp, self.image = (
+            self.image.transpose(1, 2, 0) if self.upscale_factor != 0.5 else self.image,
+            None,
+        )
         self.image, temp = temp, None
         self.color_channels, self.alpha = None, None
         return self
@@ -412,7 +414,6 @@ class ImageContainer:
         """
         perceived value = ( ( pixel value / max value ) ** ( 1 / gamma ) ) * max value
         """
-
         if self.upscale_color_with_generator:
             cc_dtype = self.color_channels.dtype
             if not gamma == 1.0:
@@ -475,32 +476,26 @@ class ImageContainer:
             channels = np.vectorize(self.linear_to_sRGB)(channels)
         return channels.astype(self.upscale_precision[0])
 
-    def convert_output_image_dtype(self, channels: np.ndarray) -> np.ndarray:
+    def convert_output_image_dtype(
+        self, channels: np.ndarray, input_dtype: str = None, out_dtype: str = None
+    ) -> np.ndarray:
         """
-        Convert (scale) the uprezzed image to the proper export datatype as
+        Convert (scale) the upscaled image to the proper export datatype as
         indicated in the app_config.ConfigReference class.
         """
-
         # unlike for the PNG format, the IMWRITE function requires float arrays and exports half or float precision based on the cv2.IMWRITE flag speficier when saving the image
         trg_dtype = (
             self.trg_image_dtype if not self.export_format == "exr" else "float32"
         )
-
-        if f"{self.src_dtype}:{self.trg_image_dtype}" in confref.truncated_casting:
-            write_log_to_file(
-                "WARNING",
-                f"Pixel detail for image {self.src_image_name} in {self.src_path} may be lost due to: \n\tsource image color depth: {self.src_dtype}, target image color depth: {trg_dtype} .",
-                log_file,
-            )
 
         # see the method above for details
         if "Linear Out" in self.color_space:
             channels = np.vectorize(self.sRGB_to_linear)(channels)
 
         # the self.output_dtype_mapping dictionary contains lambdas that are called on the channels passed in
-        return self.output_dtype_mapping[f"{str(channels.dtype)}:{str(trg_dtype)}"](
-            channels
-        )
+        return self.output_dtype_mapping[
+            f"{str(channels.dtype if not input_dtype else input_dtype)}:{str(trg_dtype if not out_dtype else out_dtype)}"
+        ](channels)
 
     def convert_RGB_to_grayscale(self, channels: np.ndarray) -> np.ndarray:
         return np.expand_dims(cv2.cvtColor(channels, cv2.COLOR_BGR2GRAY), 2)
@@ -512,7 +507,7 @@ class ImageContainer:
                 write_log_to_file(
                     log_type="Warning",
                     message="Added an alpha channel with a transparency value of 1/255"
-                    "So that mipmaps are written correctly. A complement transparent",
+                    "So that mipmaps are written correctly.",
                     log_file=log_file,
                 )
                 self.image = np.concatenate(arrays=(self.image, self.alpha), axis=0)
@@ -713,7 +708,6 @@ class ImageContainer:
 
     def handle_noise(self) -> Self:
         from utils.export_utils import unsharp_mask
-
         no_channels = self.image.shape[2]
         self.noisy_copy = unsharp_mask(
             image=cv2.resize(
@@ -724,21 +718,23 @@ class ImageContainer:
                 ),
                 interpolation=cv2.INTER_LANCZOS4,
             ),
-            dtype=str(self.image.dtype),
+            threshold=0.0,
+            input_dtype=str(self.noisy_copy.dtype),
         )
-
         if len(self.noisy_copy.shape) == 2:
             self.noisy_copy = np.expand_dims(self.noisy_copy, axis=2)
 
-        # A more sophisticated algorithm can be used to retain only the lightest/darkest patterns in the original texture and add them back as noise to the AI-upscaled texture
+        self.noisy_copy = self.convert_output_image_dtype(
+            self.noisy_copy, self.noisy_copy.dtype, self.image.dtype
+        )
         lim = str(no_channels - 1) if (no_channels == 2 or no_channels == 4) else ""
+        # A more sophisticated algorithm can be used to retain only the lightest/darkest patterns in the original texture and add them back as noise to the AI-upscaled texture
         exec(
             f"""self.image[..., :{lim}] = (
                     self.noisy_copy[..., :{lim}] * (self.noise_factor)
                     + self.image[...,:{lim}] * (1 - self.noise_factor)
                 ).astype(self.trg_image_dtype)"""
         )
-
         self.noisy_copy = None
         return self
 
@@ -767,7 +763,7 @@ class ImageContainer:
 
     def handle_mipmaps(self, mipmaps: str, img):
         """
-        img: a wand image
+        img: a wand image object
         """
         from utils.export_utils import calc_mipmaps
 
@@ -799,8 +795,15 @@ class ImageContainer:
             "float16:uint16": lambda channels: (
                 np.clip(channels, 0.0, 1.0) * 65535
             ).astype("uint16"),
-            "float16:float16": lambda channels: channels,
-            "float32:float32": lambda channels: channels,
+            "float16:float16": lambda channels: np.clip(channels, 0.0, 1.0).astype(
+                "float16"
+            ),
+            "float32:float16": lambda channels: np.clip(channels, 0.0, 1.0).astype(
+                "float16"
+            ),
+            "float32:float32": lambda channels: np.clip(channels, 0.0, 1.0).astype(
+                "float32"
+            ),
             "float32:uint8": lambda channels: (
                 np.clip(channels, 0.0, 1.0) * 255
             ).astype("uint8"),
@@ -822,11 +825,11 @@ class ImageContainer:
             "uint8:uint8": lambda channels: channels,
             "uint8:uint16": lambda channels: ((channels.astype("uint16")) * 255),
             "uint8:float32": lambda channels: self.normalize_uint(
-                image=channels, minmax_norm=True
+                image=channels
             ).astype("float32"),
             "uint16:uint16": lambda channels: channels,
             "uint16:uint8": lambda channels: (channels / 255).astype("uint8"),
             "uint16:float32": lambda channels: self.normalize_uint(
-                image=channels, minmax_norm=True
+                image=channels
             ).astype("float32"),
         }

@@ -1,15 +1,21 @@
 from __future__ import annotations
+from typing import TYPE_CHECKING
 import os, yaml
 import tkinter as tk
 import customtkinter as ctk
 import gui.ctk_fonts as fonts
 from gui.message_box import CTkMessagebox
 from gui.frames import *
+from PIL import ImageTk, Image
+from gui.tooltips import Hovertip_Frame
+import gui.tooltips.tooltip_text as ttt
 from utils.events import select_fof_event
 from utils.export_utils import copy_files
 from app_config.config import *
 from caches.cache import image_paths_cache as cache_copy
 
+if TYPE_CHECKING:
+    from gui.frames import TkListbox
 
 class ImageWindow(ctk.CTkToplevel):
     def __init__(self, *args):
@@ -129,15 +135,21 @@ class SaveConfigWindow(ctk.CTkToplevel):
             else "",
             "noise_level": ExportConfig.noise_level,
             "browsermode_on": GUIConfig.browser_mode_on,
-            "export_color_mode": {"RGBA": "RGBA", "RGB":"RGB", "LA":"Greyscale+Alpha", "L":"Greyscale", "Indexed":"Indexed"}[ExportConfig.export_color_mode],
+            "export_color_mode": {
+                "RGBA": "RGBA",
+                "RGB": "RGB",
+                "LA": "Greyscale+Alpha",
+                "L": "Greyscale",
+                "Indexed": "Indexed",
+            }[ExportConfig.export_color_mode],
             "color_space": ExportConfig.color_space,
             "export_color_depth": ExportConfig.export_color_depth,
             "gamma_adjustment": ExportConfig.gamma_adjustment,
             "upscale_precision": ExportConfig.upscale_precision,
             "split_large_image": ExportConfig.split_large_image,
-            "padding_size": ExportConfig.padding_size,
+            "split_size": ExportConfig.patch_size,
         }
-        
+
         if not os.path.exists("user_config"):
             os.mkdir("user_config")
         with open(os.path.join("user_config", f"{fn}.cfg"), "w") as yamlfile:
@@ -165,6 +177,113 @@ class SaveConfigWindow(ctk.CTkToplevel):
 
         if save:
             self.write_to_yaml(SearchConfig.go_to_file_name)
+
+    def cancel_button_event(self, value):
+        self.destroy()
+
+
+class FilterDimensionsWindow(ctk.CTkToplevel):
+    def __init__(self, lb_frame: TkListbox, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.geometry = "200x400"
+        self.title("Filter by Dimensions")
+        self.lb_frame: TkListbox = lb_frame
+        self.label = ctk.CTkLabel(self, text="Enter a filter string like: width,height,operator (i.e 1024,512,>)")
+        self.labe_tt = Hovertip_Frame(
+            anchor_widget=self.label,
+            text="",
+            hover_delay=GUIConfig.tooltip_hover_delay,
+            bg_color=GUIConfig.tooltip_color,
+            text_color=GUIConfig.tooltop_text_color,
+            image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
+            topmost=True
+        )
+        self.entry_frame = ctk.CTkFrame(
+            self, height=20, width=300, fg_color="transparent", bg_color="transparent"
+        )
+        self.entry_value = ctk.StringVar(value="")
+        self.entryfield = ctk.CTkEntry(
+            self.entry_frame,
+            placeholder_text="1024,1024,<",
+            height=20,
+            width=300,
+            textvariable=self.entry_value,
+        )
+        self.entryfield.bind("<KeyRelease>", self.set_filter_string)
+        self.entry_tt = Hovertip_Frame(
+            anchor_widget=self.entryfield,
+            text="",
+            hover_delay=GUIConfig.tooltip_hover_delay,
+            bg_color=GUIConfig.tooltip_color,
+            text_color=GUIConfig.tooltop_text_color,
+            image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
+            topmost=True
+        )
+
+        self.button_frame = ctk.CTkFrame(
+            self, height=5, width=100, fg_color="transparent", bg_color="transparent"
+        )
+        self.confirm = ctk.CTkButton(
+            self.button_frame,
+            text="Search ❗",
+            font=fonts.buttons_font(),
+            width=20,
+            height=10,
+            command=lambda: self.confirm_button_event(None),
+        )
+        self.bind("<Return>", self.confirm_button_event)
+        self.entry_tt = Hovertip_Frame(
+            anchor_widget=self.confirm,
+            text="Depending of the number of images to search through \n and their size, it may take anywhere between a couple \n of seconds to a minute to filter through them all.",
+            hover_delay=GUIConfig.tooltip_hover_delay,
+            bg_color=GUIConfig.tooltip_color,
+            text_color=GUIConfig.tooltop_text_color,
+            topmost=True
+        )
+
+        self.cancel = ctk.CTkButton(
+            self.button_frame,
+            text="Cancel",
+            width=20,
+            font=fonts.buttons_font(),
+            height=10,
+            command=lambda: self.cancel_button_event(None),
+        )
+        self.bind("<Escape>", self.cancel_button_event)
+        self.plot_elements()
+
+    def plot_elements(self):
+        self.label.grid(row=1, column=1, padx=5, pady=5)
+        self.entry_frame.grid(row=2, column=1, padx=5, pady=2)
+        self.entryfield.grid(row=1, column=1, padx=5, pady=2)
+        self.button_frame.grid(row=3, column=1, padx=5, pady=5)
+        self.confirm.grid(row=1, column=1, padx=5, pady=5)
+        self.cancel.grid(row=1, column=2, padx=5, pady=5)
+
+    def filter(self):
+        from gui.frames import TkListbox
+        try:
+            parsed_filter_params = SearchConfig.dimension_filter_string.split(",")
+            w = int(parsed_filter_params[0])
+            h = int(parsed_filter_params[1])
+            operator = parsed_filter_params[2]
+            TkListbox.filter_by_dimension(
+                self.lb_frame, (w, h), operator, "current_list"
+            )
+        except:
+            CTkMessagebox(
+                title="Error!",
+                message=f"Could not parse filter string. Please enter width,height,operator as your filter config (i.e. 1024,512,>=). \n"
+                "Available operators: < (less than), <= (less than or equal to), > (greater than), >= (greater than or equal to), == (equal to), != (not equal to)",
+                icon="warning",
+                option_1="Ok",
+            )
+
+    def set_filter_string(self, value):
+        SearchConfig.dimension_filter_string = self.entry_value.get()
+
+    def confirm_button_event(self, value):
+        self.filter()
 
     def cancel_button_event(self, value):
         self.destroy()
@@ -313,7 +432,9 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.exp_opts_frame.scale_subframe.menu.set(value=self.parsed_conf["scale"])
         self.exp_opts_frame.set_scale(value=self.parsed_conf["scale"])
 
-        self.exp_opts_frame.format_subframe.menu.set(value=self.parsed_conf["export_format"])
+        self.exp_opts_frame.format_subframe.menu.set(
+            value=self.parsed_conf["export_format"]
+        )
         self.exp_opts_frame.set_format(value=self.parsed_conf["export_format"])
 
         self.exp_opts_frame.set_compression(value=self.parsed_conf["compression"])
@@ -324,7 +445,7 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.exp_opts_frame.additional_options_subframe.menu.set(
             value=self.parsed_conf["mipmaps"]
         )
-        
+
         self.exp_opts_frame.set_mipmaps(value=self.parsed_conf["mipmaps"])
 
         self.exp_opts_frame.export_numbering_subframe.numbered_checkbox.select() if self.parsed_conf[
@@ -380,9 +501,9 @@ class LoadConfigWindow(ctk.CTkToplevel):
             "split_large_image"
         ] else self.addit_sett_frame.split_large_images_subframe.checkbox.deselect()
 
-        self.addit_sett_frame.set_padding_size(self.parsed_conf["padding_size"])
-        self.addit_sett_frame.padding_size_subframe.slider.set(
-            self.parsed_conf["padding_size"]
+        self.addit_sett_frame.set_patch_size(self.parsed_conf["split_size"])
+        self.addit_sett_frame.patch_size_subframe.slider.set(
+            int(self.parsed_conf["split_size"])
         )
 
     def set_export_frame(self):

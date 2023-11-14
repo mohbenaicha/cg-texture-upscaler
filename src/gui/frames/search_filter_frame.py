@@ -258,6 +258,9 @@ class SearchFilterFrame(ctk.CTkFrame):
             and_filter.delete(0, ctk.END)
             or_filter.delete(0, ctk.END)
             not_filter.delete(0, ctk.END)
+            SearchConfig.last_and_filters = ["", "", "", ""]
+            SearchConfig.last_or_filters = ["", "", "", ""]
+            SearchConfig.last_not_filters = ["", "", "", ""]
 
     def plot_self(self):
         self.grid(row=1, column=1, padx=1, pady=5, sticky="nsw")
@@ -351,7 +354,7 @@ class SearchFilterFrame(ctk.CTkFrame):
         ###
         [
             self.not_filters[i].bind(
-                "<KeyRelease>", partial(self.save_or_filters, idx=i)
+                "<KeyRelease>", partial(self.save_not_filters, idx=i)
             )
             for i in range(SearchConfig.num_not_filters)
         ]

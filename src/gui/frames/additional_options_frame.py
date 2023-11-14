@@ -1,4 +1,5 @@
 from tkinter import *
+from PIL import ImageTk, Image
 import customtkinter as ctk
 import gui.ctk_fonts as fonts
 from gui.tooltips import Hovertip_Frame
@@ -20,7 +21,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         self.upscale_precision = ctk.StringVar(value=ExportConfig.upscale_precision)
         self.export_color_depth = ctk.DoubleVar(value=ExportConfig.export_color_depth)
         self.split_large_image = ctk.BooleanVar(value=ExportConfig.split_large_image)
-        self.padding_size = ctk.DoubleVar(value=ExportConfig.padding_size)
+        self.patch_size = ctk.IntVar(value=ExportConfig.patch_size)
         self.gamma_adjustment = ctk.DoubleVar(value=ExportConfig.gamma_adjustment)
         self.broswermodeon = ctk.BooleanVar(value=GUIConfig.browser_mode_on)
 
@@ -59,7 +60,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         self.split_large_images_subframe = ctk.CTkFrame(
             self, fg_color="transparent", height=10, width=150
         )
-        self.padding_size_subframe = ctk.CTkFrame(
+        self.patch_size_subframe = ctk.CTkFrame(
             self, fg_color="transparent", height=10, width=150
         )
 
@@ -218,37 +219,39 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             text_color=GUIConfig.tooltop_text_color,
         )
         # padding size label/slider
-        self.padding_size_subframe.label = ctk.CTkLabel(
-            self.padding_size_subframe,
+        self.patch_size_subframe.label = ctk.CTkLabel(
+            self.patch_size_subframe,
             font=fonts.options_font(),
-            text=f"Padding Size {round(ExportConfig.padding_size,2)*100} %",
+            text=f"Split Size ({ConfigReference.split_sizes[ExportConfig.patch_size][0]})",
             height=20,
             width=50,
         )
-        self.padding_size_subframe.slider = ctk.CTkSlider(
-            master=self.padding_size_subframe,
-            from_=0.0,
-            to=0.2,
-            number_of_steps=20,
-            command=self.set_padding_size,
-            variable=self.padding_size,
+        self.patch_size_subframe.slider = ctk.CTkSlider(
+            master=self.patch_size_subframe,
+            from_=1,
+            to=4,
+            number_of_steps=3,
+            command=self.set_patch_size,
+            variable=self.patch_size,
             height=20,
             width=100,
         )
-        self.set_padding_size(ExportConfig.padding_size)
+        self.set_patch_size(ExportConfig.patch_size)
 
-        self.padding_size_subframe.menu_tt = Hovertip_Frame(
-            anchor_widget=self.padding_size_subframe.label,
+        self.patch_size_subframe.menu_tt = Hovertip_Frame(
+            anchor_widget=self.patch_size_subframe.label,
             text=ttt.pad_size,
             hover_delay=GUIConfig.tooltip_hover_delay,
             bg_color=GUIConfig.tooltip_color,
             text_color=GUIConfig.tooltop_text_color,
+            image=ImageTk.PhotoImage(Image.open("media\\splitimagesize.jpg"))
+            # PhotoImage(file=os.path.join("media", "splitimagesize.jpg"))
         )
         # padding size label/slider
         self.gamma_adjustment_subframe.label = ctk.CTkLabel(
             self.gamma_adjustment_subframe,
             font=fonts.options_font(),
-            text=f"Padding Size {round(ExportConfig.padding_size,2)*100} %",
+            text=f"Gamma Adjustment {round(ExportConfig.gamma_adjustment,1)}",
             height=20,
             width=50,
         )
@@ -357,14 +360,14 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         ExportConfig.upscale_precision = value
         if ExportConfig.upscale_precision == "high":
             self.set_splitlargeimages(value=False)
-            self.set_padding_size(0.0)
+            # self.set_patch_size(1)
             try:
                 self.split_large_images_subframe.grid_forget()
-                self.padding_size_subframe.grid_forget()
+                self.patch_size_subframe.grid_forget()
                 self.split_large_images_subframe.checkbox.pack_forget(side=RIGHT)
                 self.split_large_images_subframe.label.pack_forget(side=LEFT)
-                self.padding_size_subframe.label.pack_forget(side=LEFT)
-                self.padding_size_subframe.slider.pack_forget(side=RIGHT)
+                self.patch_size_subframe.label.pack_forget(side=LEFT)
+                self.patch_size_subframe.slider.pack_forget(side=RIGHT)
             except:
                 pass
         else:
@@ -372,15 +375,15 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
                 self.split_large_images_subframe.grid(
                     row=9, column=0, padx=35, pady=5, sticky="new"
                 )
-                self.padding_size_subframe.grid(row=10, column=0, padx=35, pady=5, sticky="new")
+                self.patch_size_subframe.grid(row=10, column=0, padx=35, pady=5, sticky="new")
                 self.split_large_images_subframe.checkbox.pack(side=RIGHT)
                 self.split_large_images_subframe.label.pack(side=LEFT)
-                self.padding_size_subframe.label.pack(side=LEFT)
-                self.padding_size_subframe.slider.pack(side=RIGHT)
+                self.patch_size_subframe.label.pack(side=LEFT)
+                self.patch_size_subframe.slider.pack(side=RIGHT)
             except:
                 pass
             self.set_splitlargeimages(value=True)    
-            self.set_padding_size(0.01)
+            self.set_patch_size(3)
             
 
 
@@ -393,12 +396,22 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             pass  # the value is a python native datatype: bool
         ExportConfig.split_large_image = value  # self.split_large_image.get()
         if not ExportConfig.split_large_image:
-            self.set_padding_size(0.0)
-            try:disable_UI_elements(self.padding_size_subframe.slider)
+            print_to_frame(
+            self.patch_size_subframe.label,
+            grid=False,
+            side=LEFT,
+            string="Split Size (disabled)",
+            error=False,
+            font=fonts.labels_font(),
+            text_color="white",
+            lbl_height=15,
+            lbl_width=50,
+            )
+            try:disable_UI_elements(self.patch_size_subframe.slider)
             except:pass
         else:
-            self.set_padding_size(0.01)
-            try:enable_UI_elements(self.padding_size_subframe.slider)
+            self.set_patch_size(1)
+            try:enable_UI_elements(self.patch_size_subframe.slider)
             except:pass
 
     def set_browsermode(self, value):
@@ -410,25 +423,24 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             pass  # the value is a python native datatype: bool
         GUIConfig.browser_mode_on = value  # self.broswermodeon.get()
 
-    def set_padding_size(self, value):
-        ExportConfig.padding_size = round(value, 2)
-        off = ExportConfig.padding_size == 0
+    def set_patch_size(self, value):
+        ExportConfig.patch_size = str(int(value))
         try:
             print_to_frame(
-                self.padding_size_subframe.label,
+                self.patch_size_subframe.label,
                 grid=False,
                 side=LEFT,
-                string=f"Padding Size {int(round(ExportConfig.padding_size,2)*100)} %"
-                if not off
-                else "Padding Size (Disabled)",
+                string=f"Split Size ({ConfigReference.split_sizes[ExportConfig.patch_size][0]})",
                 error=False,
                 font=fonts.labels_font(),
                 text_color="white",
                 lbl_height=15,
                 lbl_width=50,
             )
+            
         except:
             pass
+            
 
     def set_color_depth(self, value):
         ExportConfig.export_color_depth = value
@@ -486,7 +498,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         self.split_large_images_subframe.grid(
             row=9, column=0, padx=35, pady=5, sticky="new"
         )
-        self.padding_size_subframe.grid(row=10, column=0, padx=35, pady=5, sticky="new")
+        self.patch_size_subframe.grid(row=10, column=0, padx=35, pady=5, sticky="new")
 
         # plot subframe elements
 
@@ -531,5 +543,5 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         self.split_large_images_subframe.checkbox.pack(side=RIGHT)
         self.split_large_images_subframe.label.pack(side=LEFT)
 
-        self.padding_size_subframe.label.pack(side=LEFT)
-        self.padding_size_subframe.slider.pack(side=RIGHT)
+        self.patch_size_subframe.label.pack(side=LEFT)
+        self.patch_size_subframe.slider.pack(side=RIGHT)
