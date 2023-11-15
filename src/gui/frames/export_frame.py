@@ -1,4 +1,5 @@
 from typing import Union, Dict
+import sys
 import customtkinter as ctk
 from PIL import Image as pil_image
 import threading
@@ -8,7 +9,7 @@ from gui.tooltips import Hovertip_Frame
 import gui.tooltips.tooltip_text as ttt
 from gui.frames.main_listbox_frame import TkListbox
 from app_config.config import ExportConfig
-from utils.export_utils import export_images, write_log_to_file
+from utils.export_utils import export_images, write_log_to_file, log_file
 from utils.events import (
     enable_UI_elements,
     disable_UI_elements,
@@ -135,7 +136,21 @@ class ExportFrame(ctk.CTkFrame):
             bg_color="transparent",
             mode="determinate",
         )
-        self.cancel_img = pil_image.open("media/cancel.png")
+        try:
+            self.cancel_img = pil_image.open("media/cancel.png")
+        except:
+            write_log_to_file("Error", "Failed to launch, missing or faulty media: cancel.png", log_file)
+            warn = CTkMessagebox(
+                title="Error!",
+                message=f"Failed to launch, missing or faulty media: cancel.png",
+                icon="warning",
+                option_1="Ok"
+            )
+            if warn.get() == "Ok":
+                sys.exit(1)
+            else:
+                sys.exit(1)
+
         self.stop_export_button = ctk.CTkButton(
             self.progbar_subframe,
             text="",
@@ -271,7 +286,6 @@ class ExportFrame(ctk.CTkFrame):
                 "split_large_image": valid_config.get("split_large_image", True),
                 "split_size": valid_config.get("split_size", 0.0),
             }
-            print(export_config)
             return export_config
 
     def set_export_type(self):

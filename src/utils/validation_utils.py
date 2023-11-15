@@ -26,7 +26,6 @@ def validate_export_config(
     except ValidationError as error:
         errors = error.json()
         write_log_to_file("Error", f"Invalid export configuration: {config_obj}", log_file)
-    print(errors)
     return config_obj, errors
 
 

@@ -189,7 +189,8 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
         self.title("Filter by Dimensions")
         self.lb_frame: TkListbox = lb_frame
         self.label = ctk.CTkLabel(self, text="Enter a filter string like: width,height,operator (i.e 1024,512,>)")
-        self.labe_tt = Hovertip_Frame(
+        try:
+            self.labe_tt = Hovertip_Frame(
             anchor_widget=self.label,
             text="",
             hover_delay=GUIConfig.tooltip_hover_delay,
@@ -198,6 +199,10 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
             image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
             topmost=True
         )
+        except:
+            None
+    
+        
         self.entry_frame = ctk.CTkFrame(
             self, height=20, width=300, fg_color="transparent", bg_color="transparent"
         )
@@ -210,7 +215,8 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
             textvariable=self.entry_value,
         )
         self.entryfield.bind("<KeyRelease>", self.set_filter_string)
-        self.entry_tt = Hovertip_Frame(
+        try:
+            self.entry_tt = Hovertip_Frame(
             anchor_widget=self.entryfield,
             text="",
             hover_delay=GUIConfig.tooltip_hover_delay,
@@ -219,6 +225,9 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
             image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
             topmost=True
         )
+        except:
+            None
+        
 
         self.button_frame = ctk.CTkFrame(
             self, height=5, width=100, fg_color="transparent", bg_color="transparent"

@@ -4,8 +4,11 @@ from tkinter import *
 import customtkinter as ctk
 from gui.frames.master_frame import MasterFrame
 from utils.export_utils import export_images
-from gui.frames import ExportThread
 from utils.cli_utils import parse_args, parser
+from utils.logging import log_file, write_log_to_file
+from gui.frames import ExportThread
+from gui.message_box import CTkMessagebox
+
 
 
 
@@ -23,7 +26,21 @@ def main(args: Union[Dict[str, int | str | float], None]):
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("dark-blue")
         master_frame = MasterFrame()
-        master_frame.iconbitmap("./media/upscaler.ico")
+        try:
+            master_frame.iconbitmap("./media/upscaler.ico")
+        except:
+            write_log_to_file("Error", "Failed to launch, missing or faulty media: upscaler.ico", log_file)
+            warn = CTkMessagebox(
+                title="Error!",
+                message=f"Failed to launch, missing or faulty media: upscaler.ico",
+                icon="warning",
+                option_1="Ok"
+            )
+            if warn.get() == "Ok":
+                sys.exit(1)
+            else:
+                sys.exit(1)
+
         master_frame.mainloop()
 
 

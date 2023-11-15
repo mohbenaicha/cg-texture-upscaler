@@ -165,11 +165,4 @@ class Generator(nn.Module):
             )
         )
         x = self.final_conv(self.act(self.pen_conv(x)))
-        print(f"::: post final conv:::{torch.cuda.memory_reserved()/1024**3}")
-
-        mem_alloc_after = torch.cuda.memory_allocated()/1024**3
-        mem_res_after = torch.cuda.memory_reserved()/1024**3
-
-        print("::: mem_alloc_after::: : ", mem_alloc_after)
-        print("::: mem_res_after::: : ", mem_res_after)
         return x

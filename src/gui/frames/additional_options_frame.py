@@ -210,7 +210,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             width=80,
             font=fonts.buttons_font(),
         )
-        self.set_upscale_precision(ExportConfig.upscale_precision)
+        
         self.upscale_precision_subframe.menu_tt = Hovertip_Frame(
             anchor_widget=self.upscale_precision_subframe.label,
             text=ttt.upscale_precision,
@@ -236,17 +236,21 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             height=20,
             width=100,
         )
-        self.set_patch_size(ExportConfig.patch_size)
+        
 
-        self.patch_size_subframe.menu_tt = Hovertip_Frame(
-            anchor_widget=self.patch_size_subframe.label,
-            text=ttt.pad_size,
-            hover_delay=GUIConfig.tooltip_hover_delay,
-            bg_color=GUIConfig.tooltip_color,
-            text_color=GUIConfig.tooltop_text_color,
-            image=ImageTk.PhotoImage(Image.open("media\\splitimagesize.jpg"))
-            # PhotoImage(file=os.path.join("media", "splitimagesize.jpg"))
-        )
+        try:
+            self.patch_size_subframe.menu_tt = Hovertip_Frame(
+                anchor_widget=self.patch_size_subframe.label,
+                text=ttt.pad_size,
+                hover_delay=GUIConfig.tooltip_hover_delay,
+                bg_color=GUIConfig.tooltip_color,
+                text_color=GUIConfig.tooltop_text_color,
+                image=ImageTk.PhotoImage(Image.open("media\\splitimagesize.jpg"))
+                # PhotoImage(file=os.path.join("media", "splitimagesize.jpg"))
+        
+            )
+        except:
+            None
         # padding size label/slider
         self.gamma_adjustment_subframe.label = ctk.CTkLabel(
             self.gamma_adjustment_subframe,
@@ -331,6 +335,14 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
 
     def set_device(self, value):
         ExportConfig.device = value
+        if ExportConfig.device == "cpu":
+            self.set_upscale_precision("high")
+            disable_UI_elements(self.upscale_precision_subframe.menu)
+        else:
+            self.set_upscale_precision("normal")
+            enable_UI_elements(self.upscale_precision_subframe.menu)
+
+        print(ExportConfig.upscale_precision, ExportConfig.split_large_image, ExportConfig.patch_size)
 
     def set_color_mode(self, value):
         value = {"RGBA": "RGBA", "RGB":"RGB", "Greyscale+Alpha": "LA", "Greyscale": "L", "Indexed": "Indexed"}[value]
@@ -359,17 +371,20 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
     def set_upscale_precision(self, value):
         ExportConfig.upscale_precision = value
         if ExportConfig.upscale_precision == "high":
-            self.set_splitlargeimages(value=False)
             # self.set_patch_size(1)
             try:
+                self.upscale_precision_subframe.menu.set("high")
                 self.split_large_images_subframe.grid_forget()
                 self.patch_size_subframe.grid_forget()
                 self.split_large_images_subframe.checkbox.pack_forget(side=RIGHT)
                 self.split_large_images_subframe.label.pack_forget(side=LEFT)
                 self.patch_size_subframe.label.pack_forget(side=LEFT)
                 self.patch_size_subframe.slider.pack_forget(side=RIGHT)
+                self.split_large_images_subframe.checkbox.deselect()
+                self.set_splitlargeimages(value=False)
             except:
                 pass
+            
         else:
             try:
                 self.split_large_images_subframe.grid(
@@ -380,11 +395,12 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
                 self.split_large_images_subframe.label.pack(side=LEFT)
                 self.patch_size_subframe.label.pack(side=LEFT)
                 self.patch_size_subframe.slider.pack(side=RIGHT)
+                self.upscale_precision_subframe.menu.set("normal")
+                self.split_large_images_subframe.checkbox.select()
+                self.set_splitlargeimages(value=True)
+                self.set_patch_size(ExportConfig.patch_size)
             except:
                 pass
-            self.set_splitlargeimages(value=True)    
-            self.set_patch_size(3)
-            
 
 
     def set_splitlargeimages(self, value):
@@ -394,7 +410,8 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             )  # the value is a customtkinter object: customtkinter.BooleanVar
         except:
             pass  # the value is a python native datatype: bool
-        ExportConfig.split_large_image = value  # self.split_large_image.get()
+        ExportConfig.split_large_image = value
+        print(ExportConfig.split_large_image)
         if not ExportConfig.split_large_image:
             print_to_frame(
             self.patch_size_subframe.label,
@@ -410,9 +427,22 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             try:disable_UI_elements(self.patch_size_subframe.slider)
             except:pass
         else:
-            self.set_patch_size(1)
-            try:enable_UI_elements(self.patch_size_subframe.slider)
-            except:pass
+            self.set_patch_size(ExportConfig.patch_size)
+            try:
+                enable_UI_elements(self.patch_size_subframe.slider)
+                print_to_frame(
+                self.patch_size_subframe.label,
+                grid=False,
+                side=LEFT,
+                string=f"Split Size ({ConfigReference.split_sizes[ExportConfig.patch_size][0]})",
+                error=False,
+                font=fonts.labels_font(),
+                text_color="white",
+                lbl_height=15,
+                lbl_width=50,
+                )
+            except:
+                pass
 
     def set_browsermode(self, value):
         try:
@@ -437,7 +467,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
                 lbl_height=15,
                 lbl_width=50,
             )
-            
+            self.patch_size_subframe.slider.set(int(ExportConfig.patch_size))
         except:
             pass
             
@@ -545,3 +575,8 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
 
         self.patch_size_subframe.label.pack(side=LEFT)
         self.patch_size_subframe.slider.pack(side=RIGHT)
+        
+        # setup device
+        self.set_upscale_precision(ExportConfig.upscale_precision)
+        self.set_patch_size(ExportConfig.patch_size)
+        self.set_device("cpu")

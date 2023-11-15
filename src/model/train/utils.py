@@ -85,8 +85,6 @@ def make_patches(data_dir):
         if ".png" in img: # the train images were all batch converted to PNG using Image Magick before hand
             img_t = transt(Image.open(img))
             if img_t.data.size()[0] > 1 and img_t.data.size()[1] >= 2048 and img_t.data.size()[2] >= 2048:
-                #print(img_t.size())
-                #torch.Tensor.unfold(dimension, size, step)
                 #slices the images into 8*8 size patches
                 patches = img_t.data.unfold(1,1024,1024).unfold(2,1024,1024)
                 for i in range(2):

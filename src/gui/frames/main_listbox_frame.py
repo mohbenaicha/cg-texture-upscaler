@@ -625,12 +625,16 @@ class TkListbox(ctk.CTkFrame):
                 os.startfile(pth)
 
     def preview_image(self, value):
+        no_preview = False
         log_file = write_log_to_file(None, None, None)
         selection = self.curselection()
         len_selection = len(selection)
         if len_selection >= 1:
             idx = selection[0]
-        no_peview = False
+        else:
+            no_preview = True
+        if no_preview:
+            return
         image_to_open = os.path.join(imcache[1][idx], imcache[0][idx])
         try:
             if image_to_open[-3:] == "exr":
@@ -651,8 +655,11 @@ class TkListbox(ctk.CTkFrame):
                 f"Could not open {imcache[0][idx]} due to the following error: {e}. \n (path: {image_to_open})",
                 log_file,
             )
-            no_peview = True
-            raw_img = Image.open(os.path.join("media", "no_preview.jpg"))
+            no_preview = True
+            try:
+                raw_img = Image.open(os.path.join("media", "no_preview.jpg"))
+            except:
+                return
             # continue
 
         w, h = raw_img.size
@@ -670,7 +677,7 @@ class TkListbox(ctk.CTkFrame):
                 width=im_w,
                 height=im_h,
                 mode=raw_img.mode,
-                no_preview=no_peview,
+                no_preview=no_preview,
             )
         except:
             self.toplevel_window = (
@@ -684,7 +691,7 @@ class TkListbox(ctk.CTkFrame):
                 width=im_w,
                 height=im_h,
                 mode=raw_img.mode,
-                no_preview=no_peview,
+                no_preview=no_preview,
             )
 
         self.toplevel_window.attributes("-topmost", 1)

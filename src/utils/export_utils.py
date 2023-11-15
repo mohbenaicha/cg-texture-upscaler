@@ -249,10 +249,10 @@ def setup_generator(
                     if generator == None
                     else generator
                 )
-                generator.eval() if export_config[
+                generator.eval() if (export_config[
                     "upscale_precision"
-                ] == "high" else generator.eval().half()
-                torch.cuda.set_per_process_memory_fraction(confref.limit_vram_value, 0)
+                ] == "high") or (export_config["device"] == "cpu") else generator.eval().half()
+                if export_config["device"] == "cuda": torch.cuda.set_per_process_memory_fraction(confref.limit_vram_value, 0)
             except (
                 Exception
             ) as e:  # this will raise an error related to lacking weight (.pth) files or missing Cuda .libs
@@ -314,7 +314,6 @@ def handle_image_split(channel_type: str = "color") -> Tuple[np.ndarray, int]:
     # w x h x scale x (vram for 512x512 image) x (pixel count of 512x512 image)
 
     max_size_to_split = confref.split_sizes[ExportConfig.patch_size][1] #4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
-    print("----max_size_to_split ", max_size_to_split)
     split = True if size[0]*size[1]*scale*scale > max_size_to_split else False
     
     if split:
@@ -331,16 +330,13 @@ def handle_image_split(channel_type: str = "color") -> Tuple[np.ndarray, int]:
             )
             min_ = min(lr_image.shape[:2])
             no_patches = 0
-            while True:  # maximum of 50 x 50 patches
+            while True:  
                 no_patches += 1
                 patch_size = (min_ / no_patches) + pad_size * 2
-                print("Candidate patch size::: ", patch_size)
                 if (patch_size*scale)**2 <= max_size_to_split:
                     patch_size = math.ceil(min_ / no_patches)
                     break
             patch_size += (1 if not patch_size % 2 == 0 else 0)
-            # patch_size = min(min(lr_image.shape[:2]), 4096//scale) # take the minimum of the two dimensions - call it min_dim, the minimum of min_dim and the max supported upscale resolution divided by the scale
-            print("patch_size, pad_size", patch_size, pad_size)
 
             patches, p_shape = split_image_into_overlapping_patches(
                 lr_image, patch_size=patch_size, padding_size=pad_size
@@ -434,52 +430,77 @@ def scale_image(
     )
     if generator:
         try:
-            gc.collect()
-            torch.cuda.empty_cache()
-            torch.cuda.reset_max_memory_allocated()
+            # determine sort cuda memory allocation if gpu-based upscaling is chosen
+            device = export_config["device"]
+            if not export_config["device"] == "cpu":
+                gc.collect()
+                torch.cuda.empty_cache()
+                torch.cuda.reset_max_memory_allocated()
+            else:
+                ExportConfig.split_large_image = False
+                confref.split_color = False
+                confref.split_alpha = False
+            
             if master:
                 master.print_export_logs(f"Upscaling {im_name}")
             with torch.inference_mode():
-                with torch.autocast(
-                    device_type=export_config["device"],
-                    dtype=confref.upscale_precision_levels[export_config["device"]][
-                        export_config["upscale_precision"]
-                    ][1],
-                ):
+                if device == "cuda":
+                    with torch.autocast(
+                        device_type=device,
+                        dtype=confref.upscale_precision_levels[device][
+                            export_config["upscale_precision"]
+                        ][1],
+                    ):
                     # upscaling color
+                        if img.upscale_color_with_generator:
+                            if ExportConfig.split_large_image:
+                                img.color_channels = handle_patch_upscaling(
+                                    img.color_channels, "color", generator, export_config
+                                )
+                            if (not ExportConfig.split_large_image) or (
+                                not confref.split_color
+                            ):
+                                img.color_channels = generator(
+                                    confref.inference_transform(image=img.color_channels)[
+                                        "image"
+                                    ]
+                                    .unsqueeze(0)
+                                    .to(export_config["device"])
+                                )[0]
+
+                        # upscaling alpha
+                        if img.upscale_alpha_with_generator:
+                            if ExportConfig.split_large_image:
+                                img.alpha = handle_patch_upscaling(
+                                    img.alpha, "alpha", generator, export_config
+                                )
+                            if (not ExportConfig.split_large_image) or (
+                                not confref.split_alpha
+                            ):
+                                img.alpha = generator(
+                                    confref.inference_transform(image=img.alpha)["image"]
+                                    .unsqueeze(0)
+                                    .to(export_config["device"])
+                                )[0]
+                
+                else:
                     if img.upscale_color_with_generator:
-                        if ExportConfig.split_large_image:
-                            img.color_channels = handle_patch_upscaling(
-                                img.color_channels, "color", generator, export_config
-                            )
-                        if (not ExportConfig.split_large_image) or (
-                            not confref.split_color
-                        ):
-                            img.color_channels = generator(
-                                confref.inference_transform(image=img.color_channels)[
-                                    "image"
-                                ]
-                                .unsqueeze(0)
-                                .to(export_config["device"])
-                            )[0]
-
-                    # upscaling alpha
+                        img.color_channels = generator(
+                            confref.inference_transform(image=img.color_channels)[
+                                "image"
+                            ]
+                            .unsqueeze(0)
+                            .to(device=device, dtype=torch.float32)
+                        )[0]
                     if img.upscale_alpha_with_generator:
-                        if ExportConfig.split_large_image:
-                            img.alpha = handle_patch_upscaling(
-                                img.alpha, "alpha", generator, export_config
-                            )
-                        if (not ExportConfig.split_large_image) or (
-                            not confref.split_alpha
-                        ):
-                            img.alpha = generator(
-                                confref.inference_transform(image=img.alpha)["image"]
-                                .unsqueeze(0)
-                                .to(export_config["device"])
-                            )[0]
-            img.handle_gamma_correction(1 / export_config["gamma_adjustment"])
-            img.recombine_channels()
-
+                        img.alpha = generator(
+                            confref.inference_transform(image=img.alpha)["image"]
+                            .unsqueeze(0)
+                            .to(device=device, dtype=torch.float32)
+                        )[0]
+                
+                img.handle_gamma_correction(1 / export_config["gamma_adjustment"])
+                img.recombine_channels()
         except Exception as e:
             if type(e) == torch.cuda.OutOfMemoryError:
                 write_log_to_file(
@@ -553,7 +574,7 @@ def export_images(
             not_processed = []
             tot_images = len(export_indices)
             # determine maximum vram available once before the loop to batch process images
-            max_vram = (
+            if export_config["device"] == "cuda": max_vram = (
                 torch.cuda.get_device_properties(0).total_memory / (1024**3)
                 if ExportConfig.device == "cuda"
                 else None
@@ -707,7 +728,7 @@ def export_images(
         )
 
         # clear GPU memory after export loop finishes
-        torch.cuda.empty_cache()
+        if export_config["device"] == "cuda": torch.cuda.empty_cache()
 
         # end export task (kill thread)
         task.stop()

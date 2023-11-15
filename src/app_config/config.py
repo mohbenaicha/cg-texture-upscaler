@@ -101,7 +101,7 @@ class ConfigReference:
             "high": (np.float32, torch.float32),
         },
         "cpu": {
-            "normal": (np.float16, torch.bfloat16),
+            "normal": (np.float16, torch.float16),
             "high": (np.float32, torch.float32),
         },
     }
@@ -208,7 +208,7 @@ class ExportConfig:
     save_in_existing_location: bool = False
     weight_file: Union[str, None] = "saved_models"
     noise_level: float = 0.5
-    upscale_precision: str = "normal"
+    upscale_precision: str = "high"
     export_color_mode: str = ConfigReference.color_modes[0]
     color_space: str = ConfigReference.supported_color_spaces[0]
     export_color_depth: int = ConfigReference.export_color_depth[export_format][0]
@@ -253,6 +253,6 @@ class GUIConfig:
 class TechnicalConfig:
     gui_version: str = "0.0.6"
     cli_version: str = "0.0.5"
-    app_display_name: str = "CG Texture Upscaler and Utility" 
-    app_cli_name: str = "CG Texture Upscaler and Utility"#"CG Texture Upscaler CLI"
+    app_display_name: str = "CG Texture Upscaler" 
+    app_cli_name: str = "CG Texture Upscaler CLI" 
     app_author: str = "Mohamed Benaicha" 
