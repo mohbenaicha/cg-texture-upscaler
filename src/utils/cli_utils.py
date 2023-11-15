@@ -276,7 +276,7 @@ def parse_args(args: argparse.ArgumentParser):
         args.compression = args.png_compression
     elif args.export_format == "jpg":
         args.compression = args.jpg_quality
-
+    
     # clean pre/suffix
     for char in serconf.illegal_search_characters:
         if char in args.prefix or char in args.suffix:
@@ -292,6 +292,9 @@ def parse_args(args: argparse.ArgumentParser):
                     f"{serconf.illegal_search_characters}",
                 )
             sys.exit(1)
+    # device
+    if args.device == "cpu":
+        args.upscale_precision = "high"
 
     # color depth
     if not args.export_color_depth in [8, 16, 32]:
