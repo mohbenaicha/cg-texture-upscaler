@@ -491,6 +491,7 @@ class ImageContainer:
         # see the method above for details
         if "Linear Out" in self.color_space:
             channels = np.vectorize(self.sRGB_to_linear)(channels)
+            input_dtype = channels.dtype
 
         # the self.output_dtype_mapping dictionary contains lambdas that are called on the channels passed in
         return self.output_dtype_mapping[
@@ -719,22 +720,17 @@ class ImageContainer:
                 interpolation=cv2.INTER_LANCZOS4,
             ),
             threshold=0.0,
+            amount=15,
             input_dtype=str(self.noisy_copy.dtype),
         )
         if len(self.noisy_copy.shape) == 2:
             self.noisy_copy = np.expand_dims(self.noisy_copy, axis=2)
-
         self.noisy_copy = self.convert_output_image_dtype(
             self.noisy_copy, self.noisy_copy.dtype, self.image.dtype
         )
-        lim = str(no_channels - 1) if (no_channels == 2 or no_channels == 4) else ""
         # A more sophisticated algorithm can be used to retain only the lightest/darkest patterns in the original texture and add them back as noise to the AI-upscaled texture
-        exec(
-            f"""self.image[..., :{lim}] = (
-                    self.noisy_copy[..., :{lim}] * (self.noise_factor)
-                    + self.image[...,:{lim}] * (1 - self.noise_factor)
-                ).astype(self.trg_image_dtype)"""
-        )
+        mask = self.noisy_copy < self.image*(self.noise_factor)
+        np.copyto(self.image, self.noisy_copy, where=mask)
         self.noisy_copy = None
         return self
 
@@ -819,9 +815,7 @@ class ImageContainer:
             "float64:uint16": lambda channels: (
                 np.clip(channels, 0.0, 1.0) * 65535
             ).astype("uint16"),
-            "float64:uint8": lambda channels: (
-                np.clip(channels, 0.0, 1.0) * 255
-            ).astype("uint8"),
+            "float64:uint8": lambda channels: (np.clip(channels, 0.0, 1.0) * 255).astype("uint8"),
             "uint8:uint8": lambda channels: channels,
             "uint8:uint16": lambda channels: ((channels.astype("uint16")) * 255),
             "uint8:float32": lambda channels: self.normalize_uint(

@@ -471,19 +471,18 @@ class TkListbox(ctk.CTkFrame):
             if fn[-3:] in ConfigReference.available_export_formats:
                 img_obj = (
                     cv2.imread(ffp, cv2.IMREAD_UNCHANGED)
-                    if imcache[0][keep_idx] in ConfigReference.opencv_formats
+                    if fn[-3:] in ConfigReference.opencv_formats
                     else np.array(Image.open(fp=ffp))
                 )
                 try:
+                    
                     cond = SearchConfig.dimension_filter_operator_map[operator](
                         (img_obj.shape[1], img_obj.shape[0]), # current image's dimension
                         (dimensions[0], dimensions[1]), # user's specified dimensions
                     )
-                    
                 except:  # when the images dimensions can't be processed skip the image
                     cond = False
-
-                if cond:
+                if not cond == False:
                     keep_idx += 1
                 else:
                     remaining -= 1

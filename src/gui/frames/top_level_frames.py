@@ -17,6 +17,7 @@ from caches.cache import image_paths_cache as cache_copy
 if TYPE_CHECKING:
     from gui.frames import TkListbox
 
+
 class ImageWindow(ctk.CTkToplevel):
     def __init__(self, *args):
         super().__init__(*args)
@@ -188,21 +189,23 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
         self.geometry = "200x400"
         self.title("Filter by Dimensions")
         self.lb_frame: TkListbox = lb_frame
-        self.label = ctk.CTkLabel(self, text="Enter a filter string like: width,height,operator (i.e 1024,512,>)")
+        self.label = ctk.CTkLabel(
+            self,
+            text="Enter a filter string like: width,height,operator (i.e 1024,512,>)",
+        )
         try:
             self.labe_tt = Hovertip_Frame(
-            anchor_widget=self.label,
-            text="",
-            hover_delay=GUIConfig.tooltip_hover_delay,
-            bg_color=GUIConfig.tooltip_color,
-            text_color=GUIConfig.tooltop_text_color,
-            image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
-            topmost=True
-        )
+                anchor_widget=self.label,
+                text="",
+                hover_delay=GUIConfig.tooltip_hover_delay,
+                bg_color=GUIConfig.tooltip_color,
+                text_color=GUIConfig.tooltop_text_color,
+                image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
+                topmost=True,
+            )
         except:
             None
-    
-        
+
         self.entry_frame = ctk.CTkFrame(
             self, height=20, width=300, fg_color="transparent", bg_color="transparent"
         )
@@ -217,17 +220,16 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
         self.entryfield.bind("<KeyRelease>", self.set_filter_string)
         try:
             self.entry_tt = Hovertip_Frame(
-            anchor_widget=self.entryfield,
-            text="",
-            hover_delay=GUIConfig.tooltip_hover_delay,
-            bg_color=GUIConfig.tooltip_color,
-            text_color=GUIConfig.tooltop_text_color,
-            image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
-            topmost=True
-        )
+                anchor_widget=self.entryfield,
+                text="",
+                hover_delay=GUIConfig.tooltip_hover_delay,
+                bg_color=GUIConfig.tooltip_color,
+                text_color=GUIConfig.tooltop_text_color,
+                image=ImageTk.PhotoImage(Image.open("media\\filter_by_dimension.jpg")),
+                topmost=True,
+            )
         except:
             None
-        
 
         self.button_frame = ctk.CTkFrame(
             self, height=5, width=100, fg_color="transparent", bg_color="transparent"
@@ -247,7 +249,7 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
             hover_delay=GUIConfig.tooltip_hover_delay,
             bg_color=GUIConfig.tooltip_color,
             text_color=GUIConfig.tooltop_text_color,
-            topmost=True
+            topmost=True,
         )
 
         self.cancel = ctk.CTkButton(
@@ -271,6 +273,7 @@ class FilterDimensionsWindow(ctk.CTkToplevel):
 
     def filter(self):
         from gui.frames import TkListbox
+
         try:
             parsed_filter_params = SearchConfig.dimension_filter_string.split(",")
             w = int(parsed_filter_params[0])

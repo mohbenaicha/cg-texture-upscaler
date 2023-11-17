@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 from tkinter import *
 import customtkinter as ctk
+import math
 import gui.ctk_fonts as fonts
 from gui.tooltips import Hovertip_Frame
 from app_config.config import ExportConfig, ConfigReference, GUIConfig
@@ -184,7 +185,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             master=self.denoise_subframe,
             from_=0.0,
             to=1.0,
-            number_of_steps=20,
+            number_of_steps=100,
             command=self.set_noise,
             variable=self.noise,
             height=20,
@@ -457,7 +458,12 @@ class ExportOptionsFrame(ctk.CTkFrame):
             lbl_height=15,
             lbl_width=50,
         )
-        ExportConfig.noise_level = round(value, 2)
+        if not value == 0:
+            ExportConfig.noise_level = round(
+               (1 - ((1-value)/5))**2, 2
+            )
+        else:
+            ExportConfig.noise_level = 0.0
 
     def set_mipmaps(self, value):
         ExportConfig.mipmaps = value
@@ -467,7 +473,9 @@ class ExportOptionsFrame(ctk.CTkFrame):
             else:
                 modes, set_value = ["RGBA"], "RGBA"
 
-            self.addit_sett_subframe.plot_color_mode_subframe_and_elements(modes, set_value)
+            self.addit_sett_subframe.plot_color_mode_subframe_and_elements(
+                modes, set_value
+            )
 
     def set_numbering(self, value):
         ExportConfig.save_numbering = self.numbered.get()
@@ -500,7 +508,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             self.export_suffix_subframe.suffix_field.delete(0, ctk.END)
             self.export_suffix_subframe.suffix_field.insert(0, legal_string)
 
-            ExportConfig.save_suffix = legal_string  # self.suffix.get()
+            ExportConfig.save_suffix = legal_string
 
     def get_export_list(self):
         return self.lb_frame.listbox.getselected()

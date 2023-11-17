@@ -203,14 +203,14 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         self.upscale_precision_subframe.menu = ctk.CTkOptionMenu(
             master=self.upscale_precision_subframe,
             dynamic_resizing=False,
-            values=list(confref.upscale_precision_levels['cuda'].keys()),
+            values=list(confref.upscale_precision_levels["cuda"].keys()),
             command=self.set_upscale_precision,
             variable=self.upscale_precision,
             height=20,
             width=80,
             font=fonts.buttons_font(),
         )
-        
+
         self.upscale_precision_subframe.menu_tt = Hovertip_Frame(
             anchor_widget=self.upscale_precision_subframe.label,
             text=ttt.upscale_precision,
@@ -236,7 +236,6 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             height=20,
             width=100,
         )
-        
 
         try:
             self.patch_size_subframe.menu_tt = Hovertip_Frame(
@@ -247,7 +246,6 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
                 text_color=GUIConfig.tooltop_text_color,
                 image=ImageTk.PhotoImage(Image.open("media\\splitimagesize.jpg"))
                 # PhotoImage(file=os.path.join("media", "splitimagesize.jpg"))
-        
             )
         except:
             None
@@ -342,10 +340,14 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             self.set_upscale_precision("normal")
             enable_UI_elements(self.upscale_precision_subframe.menu)
 
-        print(ExportConfig.upscale_precision, ExportConfig.split_large_image, ExportConfig.patch_size)
-
     def set_color_mode(self, value):
-        value = {"RGBA": "RGBA", "RGB":"RGB", "Greyscale+Alpha": "LA", "Greyscale": "L", "Indexed": "Indexed"}[value]
+        value = {
+            "RGBA": "RGBA",
+            "RGB": "RGB",
+            "Greyscale+Alpha": "LA",
+            "Greyscale": "L",
+            "Indexed": "Indexed",
+        }[value]
         ExportConfig.export_color_mode = value
 
     def set_color_space(self, value):
@@ -384,13 +386,15 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
                 self.set_splitlargeimages(value=False)
             except:
                 pass
-            
+
         else:
             try:
                 self.split_large_images_subframe.grid(
                     row=9, column=0, padx=35, pady=5, sticky="new"
                 )
-                self.patch_size_subframe.grid(row=10, column=0, padx=35, pady=5, sticky="new")
+                self.patch_size_subframe.grid(
+                    row=10, column=0, padx=35, pady=5, sticky="new"
+                )
                 self.split_large_images_subframe.checkbox.pack(side=RIGHT)
                 self.split_large_images_subframe.label.pack(side=LEFT)
                 self.patch_size_subframe.label.pack(side=LEFT)
@@ -402,7 +406,6 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             except:
                 pass
 
-
     def set_splitlargeimages(self, value):
         try:
             value = (
@@ -411,35 +414,36 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         except:
             pass  # the value is a python native datatype: bool
         ExportConfig.split_large_image = value
-        print(ExportConfig.split_large_image)
         if not ExportConfig.split_large_image:
             print_to_frame(
-            self.patch_size_subframe.label,
-            grid=False,
-            side=LEFT,
-            string="Split Size (disabled)",
-            error=False,
-            font=fonts.labels_font(),
-            text_color="white",
-            lbl_height=15,
-            lbl_width=50,
-            )
-            try:disable_UI_elements(self.patch_size_subframe.slider)
-            except:pass
-        else:
-            self.set_patch_size(ExportConfig.patch_size)
-            try:
-                enable_UI_elements(self.patch_size_subframe.slider)
-                print_to_frame(
                 self.patch_size_subframe.label,
                 grid=False,
                 side=LEFT,
-                string=f"Split Size ({ConfigReference.split_sizes[ExportConfig.patch_size][0]})",
+                string="Split Size (disabled)",
                 error=False,
                 font=fonts.labels_font(),
                 text_color="white",
                 lbl_height=15,
                 lbl_width=50,
+            )
+            try:
+                disable_UI_elements(self.patch_size_subframe.slider)
+            except:
+                pass
+        else:
+            self.set_patch_size(ExportConfig.patch_size)
+            try:
+                enable_UI_elements(self.patch_size_subframe.slider)
+                print_to_frame(
+                    self.patch_size_subframe.label,
+                    grid=False,
+                    side=LEFT,
+                    string=f"Split Size ({ConfigReference.split_sizes[ExportConfig.patch_size][0]})",
+                    error=False,
+                    font=fonts.labels_font(),
+                    text_color="white",
+                    lbl_height=15,
+                    lbl_width=50,
                 )
             except:
                 pass
@@ -470,7 +474,6 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             self.patch_size_subframe.slider.set(int(ExportConfig.patch_size))
         except:
             pass
-            
 
     def set_color_depth(self, value):
         ExportConfig.export_color_depth = value
@@ -481,11 +484,13 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
     def plot_self(self):
         self.grid(column=1, row=0, padx=5, pady=10, sticky="new")
 
-    def plot_color_mode_subframe_and_elements(self, menu_options: List[str], set_value: str):
+    def plot_color_mode_subframe_and_elements(
+        self, menu_options: List[str], set_value: str
+    ):
         self.color_mode_subframe.grid_forget()
         self.color_mode_subframe.menu.pack_forget()
         self.color_mode_subframe.label.pack_forget()
-        
+
         self.color_mode_subframe.grid(row=6, column=0, padx=35, pady=5, sticky="new")
         # additional options - mipmaps options menu
         self.color_mode_subframe.label.pack(side=LEFT)
@@ -495,7 +500,9 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
         self.color_mode.set(set_value)
         self.set_color_mode(set_value)
 
-    def plot_color_depth_subframe_and_elements(self, menu_options: List[str], set_value: str):
+    def plot_color_depth_subframe_and_elements(
+        self, menu_options: List[str], set_value: str
+    ):
         self.color_depth_subframe.grid(row=4, column=0, padx=35, pady=5, sticky="new")
         # additional options - mipmaps options menu
         self.color_depth_subframe.label.pack(side=LEFT)
@@ -515,8 +522,13 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             row=2, column=0, padx=38, pady=5, sticky="new"
         )
         self.device_subframe.grid(row=3, column=0, padx=35, pady=5, sticky="new")
-        self.plot_color_depth_subframe_and_elements(['8',], '8')
-        self.plot_color_mode_subframe_and_elements(['RGBA', 'RGB', 'Greyscale'], 'RGBA')
+        self.plot_color_depth_subframe_and_elements(
+            [
+                "8",
+            ],
+            "8",
+        )
+        self.plot_color_mode_subframe_and_elements(["RGBA", "RGB", "Greyscale"], "RGBA")
         self.gamma_adjustment_subframe.grid(
             row=5, column=0, padx=35, pady=5, sticky="new"
         )
@@ -575,7 +587,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
 
         self.patch_size_subframe.label.pack(side=LEFT)
         self.patch_size_subframe.slider.pack(side=RIGHT)
-        
+
         # setup device
         self.set_upscale_precision(ExportConfig.upscale_precision)
         self.set_patch_size(ExportConfig.patch_size)
