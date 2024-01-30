@@ -1,26 +1,32 @@
-This document isn't updated for the unstable 0.6.0 "release". For the latest set of arguments, please use the --help flag.
-
 Using the CLI
 
 The cli can be accessed by executing CGTextureUpscaler.exe through a terminal, and passing in the supported arguments:
-
 
 CGTextureUpscaler.exe --source_location 'c:\Users\johndoe\Desktop\my_images' --noise_level 0.25 --export_location 'original_location' -r --device cuda --scale 2x --export_format tga --compression rle --and_filters tga --or_filters nrm bc metallic mask -v -id --prefix rle --suffix 2x 
 
 
 The arguments that the CLI accepts include:
 
---device: the device to use when processing the selected images, supports values {cpu,cuda} (where cuda is gpu) (ex: --device cuda )
+--help get generate a help text detailing the accepted arguments and values
 
---scale: the scale factor to use to upscale the selected images, supports values {none,2x,4x} (example: --scale 2x )
+--device: the device to use when processing the selected images, supports values {cpu,cuda} (where cuda is gpu) (ex: --device cuda )
+    Note: CPU upscaling on supports high precision and does not support splitting images into smaller sizes in memory isn't sufficient for the image being upscaled.
+
+--scale: the scale factor to use to upscale the selected images, supports values {none,0.5x,2x,4x} (ex: --scale 2x )
 
 --export_format: the export format of the images to be processed, supports values {tga,dds,png,jpg,bmp,exr} (ex: --export_format tga )
 
---and_filters: a list of strings separated by a space that will cause ONLY the image names that contain all of the 'and' filters to be processed ( --and_filters tga nrm )
+--and_filters: a list of strings separated by a space that will cause ONLY the image names that contain ALL of the 'and' filters to be processed ( --and_filters tga nrm )
 
---or_filters: a list of strings separated by a space that will cause image names with any of the 'or' filters to be processed regardless of the 'and' filters used ( --and_filters tga nrm )
+--or_filters: a list of strings separated by a space that will cause ALL image names with ANY of the 'or' filters to be processed regardless of the 'and' filters used ( --and_filters tga nrm )
 
---compression: the compression algorithm for the image format you are processing*, can take values: {dxt1,dxt3,dxt5,jpeg,losslessjpeg,piz,pxr24,rle,undefined,zip,zips} (ex: --compression dxt5).
+--not_filters: a list of strings separated by a space that will cause image names with NONE of the 'not' filters to be processed regardless of the 'or' filters used ( --not_filters roughness, metal)
+
+--compression: the compression algorithm for the image format you are processing, can take values: {automatic, dxt1,dxt3,dxt5,rle,B44,B44A,DWAA,DWAB,NO,PIZ,PXR24,RLE,ZIP,ZIPS, none}* (ex: --compression dxt5).
+
+--png_compression: the compression level if export_format is .png, can take values: 0-9 (with 0 meaning no compression and 9 being the highest compression leve and lowest file size) (ex: --png_compression 2).
+
+--jpg_quality: the quality of the output jpg image, can take values 0-100 (lower values indicate lower quality - greater compression) (ex: --jpg_quality 92)
 
 --noise_level: the amount of noise to add. Note: noise added is not from an AI model but rather traditional upscaling algorithm. As more noise is added the AI-upscaled image's quality is reduced. Supported values: float values from 0.0 to 1.0.
 
@@ -28,7 +34,7 @@ The arguments that the CLI accepts include:
 
 --prefix: a prefix string to add to the saved file name(s) that does not include any of the following illegal characters *:?<>"|/\\   (ex: --prefix dxt5_50_mips)
 
---suffix: a suffix string to add to the saved file name(s) that does not include any of the following illegal characters *:?<>"|/\\   (ex: 2x_up)
+--suffix: a suffix string to add to the saved file name(s) that does not include any of the following illegal characters *:?<>"|/\\   (ex: --suffix 2x_up)
 
 --unique_id (or -id): a flag that, when included, gives a unique value to each image name that is saved (ex: -id)
 
@@ -38,14 +44,53 @@ The arguments that the CLI accepts include:
 
 --source_location: the folder(s) containing the image file(s) you wish to process; The path should be put in between single quotes, supports values {single path location} (ex: --source_location 'c:\users\johndoe\my_images')
 
---export_location: the target folder to which to export the processed image file(s), supports values {original_location, single path location}. The path should be put in between single quotes. If  the 'original_location' is passed as the argument, the images are saved in the place where they currently exist, if no id, prefix or suffix values are give, and if the export image format is the same as the original image format, the image file will be overwritten(ex: --export_location 'c:\users\johndoe\upscaled_images' | --export_location 'original_location')
+--export_location: the target folder to which to export the processed image file(s). The path should be put in between single quotes. If  the 'original_location' is passed as the argument, the images are saved in the place where they currently exist, if no id, prefix or suffix values are give, and if the export image format is the same as the original image format, the image file will be overwritten (ex: --export_location 'c:\users\johndoe\upscaled_images' | --export_location 'original_location').
+    Note: 
 
-*Supported compression based on file format:
-    "dds": "none", "dxt1", "dxt3", "dxt5"
+--export_color_depth: the per-channel bit depth (bpc) in which to write the images, supports values (8, 16, 32)*** (ex: --export_color_depth 8).
+
+--export_color_mode: the color mode in which to write the images, supports (RGBA, RGB, Greyscale, Indexed)**** (ex: --export_color_mode RGBA).
+
+--color_space: the space in which the image's pixels are represented, supports ('Linear In/ Linear Out', 'sRGB In/ sRGB Out', 'sRGB In/ Linear Out', 'Linear In/ sRGB Out') (ex: --color_mode 'sRGB In/ sRGB Out').
+    Note: low gamma images will not upscale well which is why this argument is provided; experiment with it to see which result is best for you. 
+
+--gamma_correction: the gamma adjustment to make to the image BEFORE upscaling; this adjustment is reversed after upscaling whent the image is written, supports (float values ranging from 0.1 to 5.0) (ex: --gamma_correction 2.2).
+    Note: when experimenting with this, start witha value of 1 since 1 means no gamma adjustment. The upscaler does not work well with high/low gamma images
+
+--upscale_precision: The detail to create/retain during and after upscaling the image, supports (high, normal) (ex: --upscale_precision normal)
+    Note: normal is recommended for most images. For high resolution images with a lot of noise, high precision is recommended.
+    Note 2: high precision upscaling does not support the two arguments below (--split_image_if_too_large, --image_split_size)
+    Note 3: high precision upscaling is the default upscaling precision if the chosen device is cpu
+
+--split_image_if_too_large: whether to split the image into smaller patches and upscale them separately then recombine them if the image is originally too large for your video card (ex: --s, ex: --split_image_if_too_large)
+    Note: not supported if upscaling precision is high, or chosen device is cpu
+    Note 2: split_image_if_too_large is seamless (does not create visible seams in the image), no matter the split size
+
+--image_split_size: the size of the new smaller images if the --split_image_if_too_large is set, supports (small, medium, large, extra large).
+    Note: start off with extra large, if that is too large for your video memory, try large and so on until.
+    Note 2: the choice of image_split_size does not affect the appearance of seams on the final written image. This process is seamless.
+    Note 3: 'small' works for video cards with under 2 GiB of VRAM, 'medium' for videos cards with 4-8 GiB of VRAM, 'large' for 12 GiB of VRAM, 'extra large' for 48 GiB of VRAM
+
+
+* Supported compression based on file format:
+    "dds": "automatic", "none", "dxt1", "dxt3", "dxt5"
     "tga": "none", "rle"
-    "bmp": "none",     -- unfortunately, the image reading and writing library used doesn't support rle compression for bmp
-    "jpg": "none", "jpeg", "losslessjpeg"
-    "exr": "none", "pxr24", "rle", "piz", "zip", "zips"
-    "png": "none",     -- note, by default PNG image information is lossless hence why no compression is supported
+    "bmp": "none", "rle"
+    "exr": "none", "B44", "B44A", "DWAA", "DWAB", "PIZ", "PXR24", "RLE", "ZIP", "ZIPS"
+    "jpg": use --jpg_quality
+    "png": use --png_compression
    
 ** The CG Texture Upscaler only exports mip maps for DDS images
+
+*** Supported color depths
+     .jpg, .dds, .bmp, and .tga support 8-bit color depth (8)
+     .png supports 8-bit and 16-bit color depth (8, 16)
+     .exr supports 16-bit and 32-bit color depth (16, 32)
+
+**** Supported color modes:
+      dds: RGB, RGBA (RGB only supported with no compression and no mipmaps, i.e. --compression none --mipmaps none)
+      tga: RGB, RGBA
+      bmp: RGB, RGBA, Indexed (Indexed only supported with rle compression, i.e. --compression rle)
+      jpg: RGB, Greyscale 
+      png: RGB, RGBA, Greyscale
+      exr: RGB, RGBA, Greyscale

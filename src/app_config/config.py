@@ -70,7 +70,7 @@ class ConfigReference:
     }
     discrete_compression_map: Dict[str, Tuple[str]] = {
         "bmp": ("none", "rle"),
-        "dds": ("automatic", "none", "dxt1", "dxt3", "dxt5"),
+        "dds": ("none", "dxt1", "dxt3", "dxt5"), #,"automatic"), # not working consistently
         "tga": ("none", "rle"),
         "exr": tuple(EXR_COMPRESSION_TYPES.__members__.keys()),
     }

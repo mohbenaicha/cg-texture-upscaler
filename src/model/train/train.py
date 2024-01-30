@@ -5,10 +5,10 @@ import argparse
 import config
 from torch import nn
 from torch import optim
-from utils import gradient_penalty, load_checkpoint, save_checkpoint, plot_examples, load_model
+from model.train.utils import gradient_penalty, load_checkpoint, save_checkpoint, plot_examples, load_model
 from loss import VGGLoss
 from torch.utils.data import DataLoader
-from model import initialize_weights, Generator, Discriminator
+from model.train.model import initialize_weights, Generator, Discriminator
 from tqdm import tqdm
 from dataset import MyImageFolder
 from torch.utils.tensorboard import SummaryWriter
@@ -57,9 +57,12 @@ def train_fn(
                 + config.LAMBDA_GP * gp
             )
 
-        opt_disc.zero_grad()
-        d_scaler.scale(loss_critic).backward()
-        d_scaler.step(opt_disc)
+        opt_disc.zero_grad() # clear gradients from last forward prop
+        # first scales the critic's loss
+        # then does a backprop calculating and accumulating gradients on the graph of the discriminator (gradients of loss_critic relative to discriminator inputs)
+        
+        d_scaler.scale(loss_critic).backward() 
+        d_scaler.step(opt_disc) # update disciriminators parameters (opt_disc contains disc_params - weights) using the accumulated gradients
         d_scaler.update()
 
         # Train Generator: min log(1 - D(G(z))) <-> max log(D(G(z))

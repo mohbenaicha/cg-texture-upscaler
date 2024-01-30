@@ -21,7 +21,6 @@ Listbox:
 Load Configuration Window
 
 - Delete selected configuration(s)						Delete
- 
 
 Miscellaneous
 

@@ -58,9 +58,15 @@ class DenseBlock(nn.Module):
         outs = [x]
         for i, layer in enumerate(self.conv_list):
             i += 1
-            outs.append(
-                self.act(layer(outs[i - 1]) if i == 1 else layer(torch.cat(outs, 1)))
-            ) if i != 5 else outs.append(layer(torch.cat(outs, 1)))
+            # outs.append(
+            #     self.act(layer(outs[i - 1]) if i == 1 else layer(torch.cat(outs, 1)))
+            # ) if i != 5 else outs.append(layer(torch.cat(outs, 1)))
+            if i != 5:
+                temp = self.act(layer(outs[i - 1]) if i == 1 else layer(torch.cat(outs, 1)))
+                outs.append(temp)
+            else:
+                temp = layer(torch.cat(outs, 1))
+                outs.append(temp)
         return outs[-1] * self.res_scale + outs[0]
 
 
@@ -85,7 +91,7 @@ class Basic_Block(nn.Module):
 
     def forward(self, x):
         residual = x.clone()
-        for block in self.dense_blocks:
+        for i, block in enumerate(self.dense_blocks):
             x = block(x)
 
         return x * self.res_scale + residual
@@ -150,6 +156,7 @@ class Generator(nn.Module):
         """
         if self.scale == 2:
             x = self.unshuffle(x)
+        
         x = self.initial_conv(x)
         basic_blocks = self.conv_body(self.basic_blocks(x))
         x = x + basic_blocks
@@ -164,5 +171,7 @@ class Generator(nn.Module):
                 F.interpolate(x, scale_factor=2, mode="nearest")
             )
         )
-        x = self.final_conv(self.act(self.pen_conv(x)))
+        
+        x = self.pen_conv(x)
+        x = self.final_conv(self.act(x))
         return x

@@ -770,6 +770,7 @@ class ImageContainer:
             img.options["dds:mipmaps"] = "0"
 
     def determine_if_alpha_is_0(self) -> None:
+        # TODO: automatic not working consistently
         if ("A" in self.mode) and (self.compression == "automatic"):
             max_, min_ = (
                 self.image.transpose(2, 0, 1)[-1].max(),

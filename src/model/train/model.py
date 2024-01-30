@@ -138,7 +138,6 @@ class Basic_Block(nn.Module):
         residual = x.clone()
         for block in self.dense_blocks:
             x = block(x)
-
         return x * self.res_scale + residual
 
 
@@ -199,7 +198,6 @@ class Generator(nn.Module):
         Returns:
             torch.Tensor: the output image tensor
         """
-
         if self.scale == 2:
             x = self.unshuffle(x)
 
@@ -218,8 +216,11 @@ class Generator(nn.Module):
             )
         )
 
-        out = self.final_conv(self.act(self.pen_conv(x)))
-        return out
+        # out = self.final_conv(self.act(self.pen_conv(x)))
+        x = self.pen_conv(x)
+        x = self.final_conv(self.act(x))
+        # return out
+        return x
 
 
 class RESRGAN:
@@ -248,7 +249,7 @@ class RESRGAN:
 
 
 class Discriminator(nn.Module):
-    def __init__(self, in_channels=3, features=[64, 64, 128, 128, 256, 256, 512, 512]):
+    def __init__(self, in_channels=3, features=[64, 64, 128, 128, 256, 256, 512, 512]): # these differ from vgg19
         super().__init__()
         blocks = []
         for idx, feature in enumerate(features):
@@ -268,9 +269,9 @@ class Discriminator(nn.Module):
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((6, 6)),
             nn.Flatten(),
-            nn.Linear(512 * 6 * 6, 1024),
+            nn.Linear(512 * 6 * 6, 1024), # vgg19 has 2 prior linear layer: 512*7*7 -> 4096, 4096 -> 4096
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Linear(1024, 1),
+            nn.Linear(1024, 1), # vgg19 feature a different terminal linear layer, 4096 -> 1000
         )
 
     def forward(self, x):
@@ -308,7 +309,9 @@ if __name__ == "__main__":
         p.numel() for p in disc.parameters()
     )
     print(pytorch_total_params)
-    # print(
-    #     [mod for mod in gen.named_modules()]
-    #     )
+    print("*"*100)
+    print(
+        [mod for mod in gen.named_modules()]
+        )
+    print("*"*100)
     print(gen.parameters)
