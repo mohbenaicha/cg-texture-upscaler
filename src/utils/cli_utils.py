@@ -244,7 +244,6 @@ parser.add_argument(
 def parse_args(args: argparse.ArgumentParser):
     """Handles user's command line arguments."""
     # 0. Setup log file and args object
-    log_file = write_log_to_file(None, None, None)
     parser.parse_args()
     # 1. Clean args
 
@@ -260,7 +259,6 @@ def parse_args(args: argparse.ArgumentParser):
         write_log_to_file(
             "Error",
             f"[ERROR] Either the source location or export location is not a valid location.",
-            log_file,
         )
         if args.verbose:
             print(
@@ -276,7 +274,7 @@ def parse_args(args: argparse.ArgumentParser):
         args.compression = args.png_compression
     elif args.export_format == "jpg":
         args.compression = args.jpg_quality
-    
+
     # clean pre/suffix
     for char in serconf.illegal_search_characters:
         if char in args.prefix or char in args.suffix:
@@ -284,7 +282,6 @@ def parse_args(args: argparse.ArgumentParser):
                 "Error",
                 f"Found an illegal character(s) in the prefix or suffix. Ensure that you don't have a any of these characters in your prefix or suffix \n"
                 f"{serconf.illegal_search_characters}",
-                log_file,
             )
             if args.verbose:
                 print(
@@ -298,9 +295,7 @@ def parse_args(args: argparse.ArgumentParser):
 
     # color depth
     if not args.export_color_depth in [8, 16, 32]:
-        write_log_to_file(
-            "ERROR", "Color depth not supported for the format selected.", log_file
-        )
+        write_log_to_file("ERROR", "Color depth not supported for the format selected.")
         if args.verbose:
             print("[ERROR] Color depth not supported. Please use 8, 16 or 32 (bpc)")
         sys.exit(1)
@@ -314,7 +309,6 @@ def parse_args(args: argparse.ArgumentParser):
             "{0}-bit color depth not supported for {1} export format. Using highest depth supported by {1} export format: {0}".format(
                 args.export_color_depth, args.export_format
             ),
-            log_file,
         )
         if args.verbose:
             print(
@@ -325,7 +319,7 @@ def parse_args(args: argparse.ArgumentParser):
         args.export_color_depth = str(
             confref.export_color_depth[args.export_format][-1]
         )
-        
+
     else:
         args.export_color_depth = str(args.export_color_depth)
 
@@ -356,7 +350,6 @@ def parse_args(args: argparse.ArgumentParser):
         write_log_to_file(
             "ERROR",
             f"Export color mode {args.export_color_mode} not supported for the specified export format {args.export_format}.\n Supported color mode for the specified export format are: \n{supported_modes}",
-            log_file,
         )
         sys.exit(1)
 
@@ -403,7 +396,6 @@ def parse_args(args: argparse.ArgumentParser):
         write_log_to_file(
             "ERROR",
             "Gamma value must be between 0.1 and 5.0 inclusive. ",
-            log_file,
         )
         sys.exit(1)
 
@@ -428,9 +420,8 @@ def parse_args(args: argparse.ArgumentParser):
         write_log_to_file(
             "ERROR",
             "noise_factor must be between 0.0 and 1.0 inclusive. ",
-            log_file,
         )
-        sys.exit(1)  
+        sys.exit(1)
     # 2. populate image cache TKListbox.populate
     TkListbox.populate(
         obj=None, parent=args.source_location, recursive=args.recursive, thread=False
@@ -448,12 +439,10 @@ def parse_args(args: argparse.ArgumentParser):
         args.not_filters,
     )
 
-    
     if len(image_paths_cache[0]) == 0:
         write_log_to_file(
             "WARNING",
             "No images that match the filters were found in the source location. Did you mean to add the recursive flag (-r) ?",
-            log_file,
         )
         if args.verbose:
             print(
@@ -471,12 +460,12 @@ def parse_args(args: argparse.ArgumentParser):
         "prefix": args.prefix,
         "suffix": args.suffix,
         "numbering": args.unique_id,
-        "export_to_original": True
-        if args.export_location == "original_location"
-        else False,
-        "single_export_location": args.export_location
-        if args.export_location != "original_location"
-        else "",
+        "export_to_original": (
+            True if args.export_location == "original_location" else False
+        ),
+        "single_export_location": (
+            args.export_location if args.export_location != "original_location" else ""
+        ),
         "verbose": args.verbose,
         "weight_file": None,
         "noise_level": args.noise_level,

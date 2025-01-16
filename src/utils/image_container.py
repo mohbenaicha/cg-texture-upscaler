@@ -1,6 +1,6 @@
 from app_config.config import *
 from utils import *
-from utils.logging import write_log_to_file, log_file
+from utils.logging import write_log_to_file
 
 
 class ImageContainer:
@@ -80,8 +80,6 @@ class ImageContainer:
         self.length = len(self.mode)
         # handle dimensions
         self.handle_dimensions(
-            log_file
-            # self.log_file
         )
 
     def preprocess_noisy_image(self) -> None:
@@ -130,7 +128,6 @@ class ImageContainer:
             write_log_to_file(
                 "WARNING",
                 f"Using linear scaling to scale image {self.src_image_name}'s channels.",
-                log_file,
             )
             self.determine_if_alpha_is_0()
             self.image = self.upscale_linear(
@@ -192,7 +189,6 @@ class ImageContainer:
                     write_log_to_file(
                         "WARNING",
                         f"Using linear scaling to scale image {self.src_image_name}'s alpha channel.",
-                        log_file,
                     )
                     self.alpha = self.upscale_linear(
                         self.alpha,
@@ -226,7 +222,6 @@ class ImageContainer:
                 write_log_to_file(
                     "WARNING",
                     f"Using linear scaling to scale image {self.src_image_name}'s color channel(s).",
-                    log_file,
                 )
                 self.color_channels = self.upscale_linear(
                     self.color_channels,
@@ -509,7 +504,6 @@ class ImageContainer:
                     log_type="Warning",
                     message="Added an alpha channel with a transparency value of 1/255"
                     "So that mipmaps are written correctly.",
-                    log_file=log_file,
                 )
                 self.image = np.concatenate(arrays=(self.image, self.alpha), axis=0)
             elif len(self.image == 4):
@@ -530,13 +524,13 @@ class ImageContainer:
         if self.export_format in confref.opencv_formats:
             self.write_opencv_image(save_path)
         else:
-            self.write_wand_image(save_path, im_name, log_file)
-        write_log_to_file("INFO", f"Saved {im_name} to {save_path}", log_file)
+            self.write_wand_image(save_path, im_name)
+        write_log_to_file("INFO", f"Saved {im_name} to {save_path}")
         if not master and verbose:
             (f"\n[INFO] Saved {im_name} to {save_path}\n")
 
     def write_wand_image(
-        self, save_path, im_name: str, log_file: TextIOWrapper
+        self, save_path, im_name: str
     ) -> None:
         self.determine_if_alpha_is_0()
         with wand_image.from_array(self.image) as img:
@@ -560,7 +554,6 @@ class ImageContainer:
                     f"{im_name} saved under {save_path} is converted to paletted color mode"
                     "to export using rle compression. True color has been indexed to 256 colors."
                     "To avoid this behaviour in the future, set bmp compression to none.",
-                    log_file,
                 )
             # the other color types pertain to grayscale/true color
             elif self.export_format != "dds":
@@ -680,7 +673,7 @@ class ImageContainer:
                     exec(statement)
         return self
 
-    def handle_dimensions(self, log_file: TextIOWrapper) -> Self:
+    def handle_dimensions(self) -> Self:
         """
         Reshapes an image by adding a single row and/or column of pixel to make
         a multiple of 2.
@@ -692,7 +685,6 @@ class ImageContainer:
                 "WARNING",
                 f"Image {self.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
                 "Will affect UV mapping.",
-                log_file,
             )
             # check if the width and/or height is a multiple of 2
             shape[0] += 1 if w_mod != 0 else 0
@@ -700,7 +692,6 @@ class ImageContainer:
             write_log_to_file(
                 "INFO",
                 f"Reshaped image {self.src_image_name} to dimensions {shape[0]}x{shape[1]} to allow for processing.",
-                log_file,
             )
             self.image = cv2.resize(
                 src=self.image, dsize=shape[:2], interpolation=cv2.INTER_LANCZOS4
@@ -709,7 +700,6 @@ class ImageContainer:
 
     def handle_noise(self) -> Self:
         from utils.export_utils import unsharp_mask
-        no_channels = self.image.shape[2]
         self.noisy_copy = unsharp_mask(
             image=cv2.resize(
                 src=self.noisy_copy,

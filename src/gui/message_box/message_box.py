@@ -11,20 +11,25 @@ from PIL import Image
 import os
 import sys
 import time
+from typing import Any, Tuple, List, Optional
 
 
 class CTkMessagebox(customtkinter.CTkToplevel):
+    """
+    A custom message box class using customtkinter.
+    """
+
     def __init__(
         self,
-        master: any = None,
+        master: Any = None,
         width: int = 400,
         height: int = 200,
         title: str = "Title",
         message: str = "Message",
         option_1: str = "OK",
-        option_2: str = None,
-        option_3: str = None,
-        options: list = [],
+        option_2: Optional[str] = None,
+        option_3: Optional[str] = None,
+        options: List[str] = [],
         border_width: int = 1,
         border_color: str = "default",
         button_color: str = "default",
@@ -33,24 +38,57 @@ class CTkMessagebox(customtkinter.CTkToplevel):
         text_color: str = "default",
         title_color: str = "default",
         button_text_color: str = "default",
-        button_width: int = None,
-        button_height: int = None,
-        cancel_button_color: str = None,
+        button_width: Optional[int] = None,
+        button_height: Optional[int] = None,
+        cancel_button_color: Optional[str] = None,
         cancel_button: str = "circle",  # types: circle, cross or none
         button_hover_color: str = "default",
         icon: str = "info",
-        icon_size: tuple = None,
+        icon_size: Optional[Tuple[int, int]] = None,
         corner_radius: int = 15,
-        font: tuple = None,
+        font: Optional[Tuple[str, int]] = None,
         header: bool = False,
         topmost: bool = True,
         fade_in_duration: int = 0,
     ):
+        """
+        Initialize the CTkMessagebox.
+
+        :param master: The master widget.
+        :param width: The width of the message box.
+        :param height: The height of the message box.
+        :param title: The title of the message box.
+        :param message: The message to display.
+        :param option_1: The first button option.
+        :param option_2: The second button option.
+        :param option_3: The third button option.
+        :param options: A list of additional options.
+        :param border_width: The width of the border.
+        :param border_color: The color of the border.
+        :param button_color: The color of the buttons.
+        :param bg_color: The background color.
+        :param fg_color: The foreground color.
+        :param text_color: The color of the text.
+        :param title_color: The color of the title text.
+        :param button_text_color: The color of the button text.
+        :param button_width: The width of the buttons.
+        :param button_height: The height of the buttons.
+        :param cancel_button_color: The color of the cancel button.
+        :param cancel_button: The type of cancel button (circle, cross, or none).
+        :param button_hover_color: The hover color of the buttons.
+        :param icon: The icon to display.
+        :param icon_size: The size of the icon.
+        :param corner_radius: The corner radius of the message box.
+        :param font: The font of the text.
+        :param header: Whether to display a header.
+        :param topmost: Whether the message box should be topmost.
+        :param fade_in_duration: The duration of the fade-in effect.
+        """
         super().__init__()
 
         self.master_window = master
-        self.width = 250 if width < 250 else width
-        self.height = 150 if height < 150 else height
+        self.width = max(250, width)
+        self.height = max(150, height)
 
         if self.master_window is None:
             self.spawn_x = int((self.winfo_screenwidth() - self.width) / 2)

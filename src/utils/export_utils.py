@@ -5,7 +5,7 @@ import math
 from PIL import ImageFile
 from wand.image import Image
 from utils import *
-from utils.logging import write_log_to_file, log_file
+from utils.logging import write_log_to_file
 from utils.image_container import ImageContainer
 
 from model.utils import *
@@ -47,7 +47,6 @@ def process_export_location(
         write_log_to_file(
             "ERROR",
             f"No export location defined: \n\tOriginal export location: {export_config['export_to_original']} \n\tSingle export location: {export_config['single_export_location']}",
-            log_file,
         )
         warning_mssg = True if master else False
         process = False
@@ -113,7 +112,7 @@ def handle_naming(export_config: dict[str, Any], im_name, index):
 
 
 def handle_dimensions(
-    img: imTypes, im_name: str, im_type: str, log_file: TextIOWrapper
+    img: imTypes, im_name: str, im_type: str
 ) -> imTypes:
     if im_type == "Numpy":
         shape = list(img.shape)
@@ -132,7 +131,6 @@ def handle_dimensions(
         write_log_to_file(
             "WARNING",
             f"Reshaped image {im_name} to dimensions {shape[0]}x{shape[1]} to allow for processing. Please double-check that this has not affected the UV mapping.",
-            log_file,
         )
         img = (
             img.resize(tuple(shape))
@@ -259,7 +257,6 @@ def setup_generator(
                 write_log_to_file(
                     "Error",
                     f"Failed to process selected image(s) due to: \n\t{e}\n",
-                    log_file,
                 )
                 warning_mssg = True
                 process = False
@@ -267,7 +264,6 @@ def setup_generator(
             write_log_to_file(
                 "INFO",
                 f"Downscaling. Chosen scale factor: {scale}",
-                log_file,
             )
             generator = None
     else:
@@ -551,7 +547,7 @@ def export_images(
 
         if export_config == None:
             write_log_to_file(
-                "ERROR", f"No export config found: {export_config}", log_file
+                "ERROR", f"No export config found: {export_config}"
             )
             write_log_to_file(
                 "INFO",

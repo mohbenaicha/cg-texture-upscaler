@@ -478,42 +478,42 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.exp_opts_frame.set_suffix(value=self.parsed_conf["suffix"])
 
     def set_additional_settings_frame(self):
-        self.addit_sett_frame.set_browsermode(self.parsed_conf["browsermode_on"])
+        self.addit_sett_frame.on_browsermode_change(self.parsed_conf["browsermode_on"])
         self.addit_sett_frame.image_browser_subframe.checkbox.select() if self.parsed_conf[
             "browsermode_on"
         ] else self.addit_sett_frame.image_browser_subframe.checkbox.deselect()
 
-        self.addit_sett_frame.set_device(self.parsed_conf["device"])
+        self.addit_sett_frame.on_device_change(self.parsed_conf["device"])
         self.addit_sett_frame.device_subframe.menu.set(self.parsed_conf["device"])
 
-        self.addit_sett_frame.set_color_space(self.parsed_conf["color_space"])
+        self.addit_sett_frame.on_color_space_change(self.parsed_conf["color_space"])
         self.addit_sett_frame.color_space_subframe.menu.set(
             self.parsed_conf["color_space"]
         )
 
-        self.addit_sett_frame.set_color_depth(self.parsed_conf["export_color_depth"])
+        self.addit_sett_frame.on_color_depth_change(self.parsed_conf["export_color_depth"])
         self.addit_sett_frame.color_depth_subframe.menu.set(
             self.parsed_conf["export_color_depth"]
         )
-        self.addit_sett_frame.set_gamma_adjustment(self.parsed_conf["gamma_adjustment"])
+        self.addit_sett_frame.on_gamma_adjustment_change(self.parsed_conf["gamma_adjustment"])
         self.addit_sett_frame.gamma_adjustment_subframe.slider.set(
             self.parsed_conf["gamma_adjustment"]
         )
-        self.addit_sett_frame.set_upscale_precision(
+        self.addit_sett_frame.on_upscale_precision_change(
             self.parsed_conf["upscale_precision"]
         )
         self.addit_sett_frame.upscale_precision_subframe.menu.set(
             self.parsed_conf["upscale_precision"]
         )
 
-        self.addit_sett_frame.set_splitlargeimages(
+        self.addit_sett_frame.on_splitlargeimages_change(
             self.parsed_conf["split_large_image"]
         )
         self.addit_sett_frame.split_large_images_subframe.checkbox.select() if self.parsed_conf[
             "split_large_image"
         ] else self.addit_sett_frame.split_large_images_subframe.checkbox.deselect()
 
-        self.addit_sett_frame.set_patch_size(self.parsed_conf["split_size"])
+        self.addit_sett_frame.on_patch_size_change(self.parsed_conf["split_size"])
         self.addit_sett_frame.patch_size_subframe.slider.set(
             int(self.parsed_conf["split_size"])
         )

@@ -20,12 +20,12 @@ def validate_export_config(
     
     if not os.path.isdir(config_obj['single_export_location']) and not config_obj['save_in_existing_location']:
         errors = f"Invalid export path: {config_obj['single_export_location']}"
-        write_log_to_file("Error", errors, log_file)
+        write_log_to_file("Error", errors)
     try:
         ExportConfigSchema(**config_obj)
     except ValidationError as error:
         errors = error.json()
-        write_log_to_file("Error", f"Invalid export configuration: {config_obj}", log_file)
+        write_log_to_file("Error", f"Invalid export configuration: {config_obj}")
     return config_obj, errors
 
 
