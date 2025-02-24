@@ -4,7 +4,7 @@ from pydantic import BaseModel, ValidationError
 from app_config.config import ExportConfig
 from utils.export_utils import write_log_to_file
 
-log_file = write_log_to_file(None, None, None)
+log_file = write_log_to_file(None, None)
 
 def validate_export_config(
     *,

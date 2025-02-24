@@ -625,7 +625,7 @@ class TkListbox(ctk.CTkFrame):
 
     def preview_image(self, value):
         no_preview = False
-        log_file = write_log_to_file(None, None, None)
+        log_file = write_log_to_file(None, None)
         selection = self.curselection()
         len_selection = len(selection)
         if len_selection >= 1:
@@ -652,7 +652,6 @@ class TkListbox(ctk.CTkFrame):
             write_log_to_file(
                 "Error",
                 f"Could not open {imcache[0][idx]} due to the following error: {e}. \n (path: {image_to_open})",
-                log_file,
             )
             no_preview = True
             try:

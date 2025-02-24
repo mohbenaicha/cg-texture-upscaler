@@ -4,8 +4,9 @@ import gc
 import math
 from PIL import ImageFile
 from wand.image import Image
+from utils.patch_upscale_strategy import *
 from utils import *
-from utils.logging import write_log_to_file
+from utils.logger import write_log_to_file
 from utils.image_container import ImageContainer
 
 from model.utils import *
@@ -270,136 +271,19 @@ def setup_generator(
         write_log_to_file(
             "INFO",
             f"Skipping upscaling, chosen scale factor: {scale}",
-            log_file,
         )
         generator = None
     return generator, scale
 
 
-def handle_padding_size(size: int) -> int:
-    """
-    Determines the padding size for image splitting
-    based on the user's setting.
-    """
-    # take the lesser of the dimensions since the padding size is a % that,
-    # if dependent on the longer dimension, may exceed the length of the
-    # shorter dimension
-    pad_size = math.floor(0.03 * min(size[:2]) / 2)
-    pad_size = int(pad_size) if pad_size % 2 == 0 else int(pad_size + 1)
-    return pad_size
-
-
-def handle_image_split(channel_type: str = "color") -> Tuple[np.ndarray, int]:
-    """
-    Determines if the image is to be split and processed in patches based on:
-        1. the maximum available vram
-        2. the split_large_image flag
-        3. the padding size
-    Returns an array of shape (num of patches, c, h,w)
-    """
-
-    global split
-    split = False  # flag used for code organization
-    if channel_type == "color":
-        size: Tuple[int] = img.color_channels.shape
-    else:
-        size: Tuple[int] = img.alpha.shape
-    # 262144 the the pixel count of the image, 0.1835 (GiB)
-    # is the video memory required process it. The memory
-    # required for other images is:
-    # w x h x scale x (vram for 512x512 image) x (pixel count of 512x512 image)
-
-    max_size_to_split = confref.split_sizes[ExportConfig.patch_size][1] #4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
-    split = True if size[0]*size[1]*scale*scale > max_size_to_split else False
-    
-    if split:
-        if channel_type == "color":
-            confref.split_color: bool = True
-        else:
-            confref.split_alpha: bool = True
-
-        if ExportConfig.split_large_image:
-            pad_size: int = handle_padding_size(size)
-
-            lr_image: np.ndarray = pad_reflect(
-                img.color_channels if channel_type == "color" else img.alpha, pad_size
-            )
-            min_ = min(lr_image.shape[:2])
-            no_patches = 0
-            while True:  
-                no_patches += 1
-                patch_size = (min_ / no_patches) + pad_size * 2
-                if (patch_size*scale)**2 <= max_size_to_split:
-                    patch_size = math.ceil(min_ / no_patches)
-                    break
-            patch_size += (1 if not patch_size % 2 == 0 else 0)
-
-            patches, p_shape = split_image_into_overlapping_patches(
-                lr_image, patch_size=patch_size, padding_size=pad_size
-            )
-            return patches, p_shape, pad_size, size
-    else:
-        return (None,) * 4
-
-
-def handle_patch_upscaling(
+def handle_upscaling(
     full_image: np.ndarray,
     channel_type: str,
     generator: Generator,
-    export_config: Union[Dict[str, Union[str, int, bool]], None],
+    export_config: dict,
+    strategy: UpscalingStrategy
 ) -> torch.Tensor:
-    full_image, p_shape, pad_size, lr_im_shape = handle_image_split(channel_type)
-    new_patches = None
-    i = 0
-    if type(full_image) == np.ndarray:
-        for patch in full_image:
-            i += 1
-            if i == 1:
-                new_patches = generator(
-                    confref.inference_transform(image=patch)["image"]
-                    .unsqueeze(0)
-                    .to(export_config["device"])
-                    .to(
-                        dtype=confref.upscale_precision_levels[export_config["device"]][
-                            export_config["upscale_precision"]
-                        ][1]
-                    )
-                ).cpu()
-            else:
-                new_patches = torch.cat(
-                    (
-                        new_patches,
-                        generator(
-                            confref.inference_transform(image=patch)["image"]
-                            .unsqueeze(0)
-                            .to(export_config["device"])
-                            .to(
-                                dtype=confref.upscale_precision_levels[
-                                    export_config["device"]
-                                ][export_config["upscale_precision"]][1]
-                            )
-                        ).cpu(),
-                    ),
-                    dim=0,
-                )
-        new_patches: torch.Tensor = new_patches.permute((0, 2, 3, 1))
-        padded_size_scaled: Tuple[int] = tuple(np.multiply(p_shape[:2], scale)) + (3,)
-        scaled_image_shape: Tuple[int] = tuple(np.multiply(lr_im_shape[:2], scale)) + (
-            3,
-        )
-
-        full_image: torch.Tensor = stitch_together(
-            patches=new_patches,
-            padded_image_shape=padded_size_scaled,
-            target_shape=scaled_image_shape,
-            padding_size=pad_size * scale,
-        )
-        del new_patches
-
-        return full_image
-        # return unpad_image(patches, pad_size * scale)
-    else:
-        return img.color_channels if channel_type == "color" else img.alpha
+    return strategy.upscale(full_image, channel_type, generator, export_config)
 
 
 def scale_image(
@@ -422,8 +306,10 @@ def scale_image(
             if type(img.alpha) == np.ndarray
             else ("no", im_name, "", "")
         ),
-        log_file,
     )
+    patch_upscale_strategy = PatchUpscalingStrategy() if ExportConfig.split_large_image else RegularUpscalingStrategy()
+    print("----------------------->")
+    
     if generator:
         try:
             # determine sort cuda memory allocation if gpu-based upscaling is chosen
@@ -449,10 +335,10 @@ def scale_image(
                     ):
                     # upscaling color
                         if img.upscale_color_with_generator:
-                            if ExportConfig.split_large_image:
-                                img.color_channels = handle_patch_upscaling(
-                                    img.color_channels, "color", generator, export_config
-                                )
+                            
+                            img.color_channels = patch_upscale_strategy.upscale(
+                                img, "color", generator, export_config, scale
+                            )
                             if (not ExportConfig.split_large_image) or (
                                 not confref.split_color
                             ):
@@ -466,10 +352,9 @@ def scale_image(
 
                         # upscaling alpha
                         if img.upscale_alpha_with_generator:
-                            if ExportConfig.split_large_image:
-                                img.alpha = handle_patch_upscaling(
-                                    img.alpha, "alpha", generator, export_config
-                                )
+                            img.alpha = patch_upscale_strategy.upscale(
+                                img, "alpha", generator, export_config, scale
+                            )
                             if (not ExportConfig.split_large_image) or (
                                 not confref.split_alpha
                             ):
@@ -502,14 +387,12 @@ def scale_image(
                 write_log_to_file(
                     "ERROR",
                     f"Could not process {im_name}. There isn't enough video memory to allocate for processing the image. Use the Split and Recombine Large Images feature , or scale using CPU as the device settings \n (path: {img.trg_path}).",
-                    log_file,
                 )
             else:
                 write_log_to_file(
                     "ERROR",
                     f"Could not process {im_name}. The program ran into an unhandled error. \n (path: {img.trg_path})."
                     f"ERROR: \n\n{e}\n\n",
-                    log_file,
                 )
             warning_mssg = True if master else False
     # Downscale Color+Alpha
@@ -552,7 +435,6 @@ def export_images(
             write_log_to_file(
                 "INFO",
                 f"No processed \n: All images from this run have not been processed.",
-                log_file,
             )
             warning_mssg, process = True, False
 
@@ -561,7 +443,6 @@ def export_images(
         write_log_to_file(
             "ERROR",
             f"Processing export configuration and image source and export paths: \n {e}.",
-            log_file,
         )
 
     # 3. Process image
@@ -595,7 +476,6 @@ def export_images(
             write_log_to_file(
                 "ERROR",
                 f"Ran into an issue while setting up the batch of images to process: \n {e}.",
-                log_file,
             )
 
         for i in export_indices:
@@ -689,7 +569,6 @@ def export_images(
                 write_log_to_file(
                     "INFO",
                     f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
-                    log_file,
                 )
                 if task.stopped():
                     break
@@ -699,28 +578,17 @@ def export_images(
                 False,
                 False,
                 False,
-        )  # reset global variables related to the current image
-            # except:
-            #     not_processed.append((im_name, im_path))
-            #     write_log_to_file(
-            #         "ERROR",
-            #         f"Ran into an issue while {step}: {im_name} ",
-            #         log_file,
-            #     )
-            #     warning_mssg = True if master else False
-            #     continue
+        )  
 
         tot_time = round(time.time() - start_time, 2)
         write_log_to_file(
             "INFO",
             f"Total time to upscale {count} image(s): {tot_time} seconds for an average of {round(tot_time/count,2)} seconds per image.",
-            log_file,
         )
         not_processed = handle_unprocessed_images(not_processed)
         write_log_to_file(
             "INFO",
             f"The following images were not written {not_processed}.",
-            log_file,
         )
 
         # clear GPU memory after export loop finishes
@@ -730,8 +598,6 @@ def export_images(
         task.stop()
         # closing the GUI master frame writes the information on the buffer to the log file due to the overridder .destroy() method
         # the CLI version requires the log file to be manually closed after the export loop
-        if not master:
-            log_file.close()  # global TextIOWrapper file needs to be closed manually since the write_to_lof_file function doesn't close it
         # sleep before removing progress bar
         if master:
             time.sleep(0.5)
@@ -765,33 +631,4 @@ def export_images(
         )
 
 
-def copy_files(export_indices: Union[List[int], None] = None, copy_location: str = ""):
-    # log_file = write_log_to_file(None, None, None)
-    warning_mssg = False
-    cache_copy = deepcopy(im_cache)
-    for i in export_indices:
-        im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-        source_img = os.path.join(im_path, im_name)
-        target_img = os.path.join(copy_location, im_name)
-        try:
-            shutil.copyfile(source_img, target_img)
-        except Exception as e:
-            if type(e) == shutil.SameFileError:
-                error = f"Copying a file to its source location \n\t({e})"
-            else:
-                error = f"Unknown \n\t({e})."
 
-            write_log_to_file(
-                "Error",
-                f"Ran into an error when attempting to copy file {im_name} due to: {error} \n  (original path: {im_path})",
-                log_file,
-            )
-            warning_mssg = True
-
-    if warning_mssg:
-        CTkMessagebox(
-            title="Warning Message!",
-            message=f"Some files were not copied. Please refer to the latest log file.",
-            icon="warning",
-            option_1="Ok",
-        )

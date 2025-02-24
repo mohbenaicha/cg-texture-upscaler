@@ -11,7 +11,7 @@ from app_config.config import SearchConfig
 from utils.export_utils import write_log_to_file
 from utils.events import *
 
-log_file = write_log_to_file(None, None, None)
+log_file = write_log_to_file(None, None)
 
 
 class SearchFilterFrame(ctk.CTkFrame):
@@ -209,7 +209,6 @@ class SearchFilterFrame(ctk.CTkFrame):
                     "WARNING",
                     f"*Illegal character(s) found in filters:   "
                     + "  ".join(bad_chars_found),
-                    log_file,
                 )
                 print(
                     f"*Illegal character(s) found in filters:   "

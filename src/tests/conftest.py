@@ -12,7 +12,7 @@ from tests.test_data.testing_config.test_export_config import TestConfig
 from gui.frames import TkListbox
 
 
-test_log_file = write_log_to_file(None, None, None)
+test_log_file = write_log_to_file(None, None)
 
 
 @pytest.fixture()  # TODO Reenable

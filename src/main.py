@@ -1,11 +1,11 @@
-import sys, os
+import sys
 from typing import Dict, Union
 from tkinter import *
 import customtkinter as ctk
 from gui.frames.master_frame import MasterFrame
 from utils.export_utils import export_images
 from utils.cli_utils import parse_args, parser
-from utils.logging import log_file, write_log_to_file
+from utils.logger import write_log_to_file
 from gui.frames import ExportThread
 from gui.message_box import CTkMessagebox
 
@@ -29,7 +29,7 @@ def main(args: Union[Dict[str, int | str | float], None]):
         try:
             master_frame.iconbitmap("./media/upscaler.ico")
         except:
-            write_log_to_file("Error", "Failed to launch, missing or faulty media: upscaler.ico", log_file)
+            write_log_to_file("Error", "Failed to launch, missing or faulty media: upscaler.ico")
             warn = CTkMessagebox(
                 title="Error!",
                 message=f"Failed to launch, missing or faulty media: upscaler.ico",

@@ -9,7 +9,7 @@ from gui.tooltips import Hovertip_Frame
 import gui.tooltips.tooltip_text as ttt
 from gui.frames.main_listbox_frame import TkListbox
 from app_config.config import ExportConfig
-from utils.export_utils import export_images, write_log_to_file, log_file
+from utils.export_utils import export_images, write_log_to_file
 from utils.events import (
     enable_UI_elements,
     disable_UI_elements,
@@ -84,7 +84,7 @@ class ExportFrame(ctk.CTkFrame):
             width=1,
             height=25,
         )  # subframe to pack select file and folder buttons
-        self.export_sub_frame.browse_button: ctk.CTkButton = ctk.CTkButton(
+        self.export_sub_frame.browse_button = ctk.CTkButton(
             self.export_sub_frame,
             text="Browse",
             font=fonts.buttons_font(),
@@ -139,7 +139,7 @@ class ExportFrame(ctk.CTkFrame):
         try:
             self.cancel_img = pil_image.open("media/cancel.png")
         except:
-            write_log_to_file("Error", "Failed to launch, missing or faulty media: cancel.png", log_file)
+            write_log_to_file("Error", "Failed to launch, missing or faulty media: cancel.png")
             warn = CTkMessagebox(
                 title="Error!",
                 message=f"Failed to launch, missing or faulty media: cancel.png",
@@ -170,7 +170,7 @@ class ExportFrame(ctk.CTkFrame):
             fg_color="transparent",
             bg_color="transparent",
         )
-        self.export_log_subframe.log_label: ctk.CTkLabel = ctk.CTkLabel(
+        self.export_log_subframe.log_label = ctk.CTkLabel(
             self.export_log_subframe,
             text="",
             width=1,
@@ -178,7 +178,7 @@ class ExportFrame(ctk.CTkFrame):
             anchor="w",
             font=fonts.list_font(),
         )
-        self.export_log_subframe.count_label: ctk.CTkLabel = ctk.CTkLabel(
+        self.export_log_subframe.count_label = ctk.CTkLabel(
             self.export_log_subframe,
             text="",
             width=1,
@@ -300,14 +300,13 @@ class ExportFrame(ctk.CTkFrame):
             enable_UI_elements(self.export_sub_frame.browse_button)
 
     def export_event(self, value):
-        log_file = write_log_to_file(None, None, None)
         exp_ids = self.lb_frame.curselection()
         if len(exp_ids) > 0:
             export_config = ExportFrame.parse_export_config(ExportConfig)
 
             if not export_config:
                 write_log_to_file(
-                    "Error", "Could not validate export config.", log_file
+                    "Error", "Could not validate export config."
                 )
                 CTkMessagebox(
                     title="Error Message!",
