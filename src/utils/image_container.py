@@ -1,6 +1,6 @@
 from app_config.config import *
 from utils import *
-from utils.logging import write_log_to_file
+from utils.logger import write_log_to_file
 
 
 class ImageContainer:
@@ -66,6 +66,16 @@ class ImageContainer:
         self.alpha: Optional[Union[torch.Tensor, np.ndarray]] = None
         self.color_channels: Optional[Union[torch.Tensor, np.ndarray]] = None
         self.read_and_preprocess_image()
+    
+    def optimize_concat(self, channels):
+    # Check if concatenation is necessary
+        if len(channels) == 1:
+            return channels[0]
+        # If channels have the same shape, no need to concatenate
+        if all(ch.shape == channels[0].shape for ch in channels):
+            return channels  # Avoid unnecessary concatenation
+        # Concatenate if necessary
+        return np.concatenate(channels, axis=-1)
 
     def read_and_preprocess_image(self) -> None:
         src_path = os.path.join(self.src_path, self.src_image_name)

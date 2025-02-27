@@ -10,7 +10,7 @@ from PIL import ImageTk, Image
 from gui.tooltips import Hovertip_Frame
 import gui.tooltips.tooltip_text as ttt
 from utils.events import select_fof_event
-from utils.export_utils import copy_files
+from utils.file_copier import FileCopier
 from app_config.config import *
 from caches.cache import image_paths_cache as cache_copy
 
@@ -827,7 +827,8 @@ class CopyFilesWindow(ctk.CTkToplevel):
             proceed = False
 
         if proceed:
-            copy_files(self.main_lb.curselection(), self.selected_fof.get())
+            FileCopier.copy_files(self.main_lb.curselection(), self.selected_fof.get())
+
 
     def cancel_button_event(self, value):
         self.destroy()
