@@ -2,6 +2,10 @@ from app_config.config import *
 from utils import *
 from utils.logger import write_log_to_file
 
+class ImageContainerInterface:
+    def __init__():
+        raise NotImplementedError
+
 
 class ImageContainer:
     """
