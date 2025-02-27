@@ -142,12 +142,15 @@ def handle_dimensions(
 
 
 def handle_unprocessed_images(unprocessed_list):
-    return "\n" + "\n".join(
-        [
-            f" - {unprocessed_list[i][0]} > > > {unprocessed_list[i][1]}"
-            for i in range(len(unprocessed_list))
-        ]
-    )
+    if len(unprocessed_list) == 0:
+        return "all_processed"
+    else:
+        return "\n" + "\n".join(
+            [
+                f" - {unprocessed_list[i][0]} > > > {unprocessed_list[i][1]}"
+                for i in range(len(unprocessed_list))
+            ]
+        )
 
 
 def unsharp_mask(
@@ -479,106 +482,115 @@ def export_images(
             )
 
         for i in export_indices:
-            # try:
-            count += 1
-            im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-            fp, step = os.path.join(im_path, im_name), "reading image."
-            sub_time_start = time.time()
+            try:
+                count += 1
+                im_name, im_path = cache_copy[0][i], cache_copy[1][i]
+                fp, step = os.path.join(im_path, im_name), "reading image."
+                sub_time_start = time.time()
 
-            if master:
-                master.print_image_index(f"Processed/Total: {count-1}/{tot_images}")
-            if not master and verbose:
-                print(f"\nAttempting to process file:\n\t {fp}\n")
-
-            if master:
-                master.print_export_logs(f"Preprocessing: {im_name}")
-
-            step = "setting up image for processing"
-            img = ImageContainer(
-                img_index=i,
-                src_path=im_path,
-                trg_path=export_config["single_export_location"]
-                if not export_config["export_to_original"]
-                else im_path,
-                img_name=im_name,
-                **export_config,
-            )
-
-            step = "attempting to scale linearly."
-            img.check_all_values_equivalent()
-            step = (
-                "attempting to split color and alpha channels for separate processing."
-            )
-            img.split_image()
-            step = "attempting to correct gamma."
-            img.handle_gamma_correction(export_config["gamma_adjustment"])
-            step = "converting the data type before upscaling."
-            img.convert_datatype(input=True)
-            step = "attempting to upscale the image with the chosen model."
-            scale_image(
-                master=master,
-                generator=generator,
-                export_config=export_config,
-                im_name=im_name,
-            )  # recombines color and alpha (if any) channel into a single array
-
-            step = "attempting to reconvert the back to the chosen export color depth."
-            # pixel values adjustments based on export color depth, export color space and gamma correction settings
-            img.convert_datatype(input=False)
-            step = "attempting to process export color mode."
-            # write color mode (RGB, RGBA, L, LA)
-            # exporting images as .dds forced RGBA
-            img.image = img.handle_write_channel_mode(img.image)
-
-            step = "applying the dds mip level workaround for the .dds image export format."
-            # dds mipmap fix
-            if export_config["export_format"] == "dds":
-                img.apply_dds_mipmap_fix()
-
-            # noise
-            if (
-                (not export_config["noise_level"] == 0.0)
-                and (
-                    not img.linear_upscale_all_channels  # if the entire image is a single value, no point in noisifying
-                )
-                and (
-                    not img.upscale_factor == 0.5
-                )  # does not support adding noise while downscaling
-            ):
                 if master:
-                    master.print_export_logs(f"Processing noise for: {im_name}")
-                step = "attempting to process color mode for noisy image."
-                img.noisy_copy = img.handle_write_channel_mode(img.noisy_copy)
-                step = "attempting to add noise."
-                img.handle_noise()
+                    master.print_image_index(f"Processed/Total: {count-1}/{tot_images}")
+                if not master and verbose:
+                    print(f"\nAttempting to process file:\n\t {fp}\n")
 
-            step = "attempting reverse color channels."
+                if master:
+                    master.print_export_logs(f"Preprocessing: {im_name}")
 
-            # channel order for wand vs. open cv write functions
-            img.handle_channel_order()
-
-            step = "attempting to save image."
-            # write
-            if master:
-                master.print_export_logs(f"Saving: {im_name}")
-            img.write_image(master=master, verbose=verbose)
-
-            if master:
-                progress += step_size
-                prog_bar.set(value=progress)
-                write_log_to_file(
-                    "INFO",
-                    f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
+                step = "setting up image for processing"
+                img = ImageContainer(
+                    img_index=i,
+                    src_path=im_path,
+                    trg_path=export_config["single_export_location"]
+                    if not export_config["export_to_original"]
+                    else im_path,
+                    img_name=im_name,
+                    **export_config,
                 )
-                if task.stopped():
-                    break
-            split, img, warn_mssg, confref.split_color, confref.split_alpha = (
-                False,
-                None,
-                False,
-                False,
-                False,
-        )  
+
+                step = "attempting to scale linearly."
+                img.check_all_values_equivalent()
+                step = (
+                    "attempting to split color and alpha channels for separate processing."
+                )
+                img.split_image()
+                step = "attempting to correct gamma."
+                img.handle_gamma_correction(export_config["gamma_adjustment"])
+                step = "converting the data type before upscaling."
+                img.convert_datatype(input=True)
+                step = "attempting to upscale the image with the chosen model."
+                scale_image(
+                    master=master,
+                    generator=generator,
+                    export_config=export_config,
+                    im_name=im_name,
+                )  # recombines color and alpha (if any) channel into a single array
+
+                step = "attempting to reconvert the back to the chosen export color depth."
+                # pixel values adjustments based on export color depth, export color space and gamma correction settings
+                img.convert_datatype(input=False)
+                step = "attempting to process export color mode."
+                # write color mode (RGB, RGBA, L, LA)
+                # exporting images as .dds forced RGBA
+                img.image = img.handle_write_channel_mode(img.image)
+
+                step = "applying the dds mip level workaround for the .dds image export format."
+                # dds mipmap fix
+                if export_config["export_format"] == "dds":
+                    img.apply_dds_mipmap_fix()
+
+                # noise
+                if (
+                    (not export_config["noise_level"] == 0.0)
+                    and (
+                        not img.linear_upscale_all_channels  # if the entire image is a single value, no point in noisifying
+                    )
+                    and (
+                        not img.upscale_factor == 0.5
+                    )  # does not support adding noise while downscaling
+                ):
+                    if master:
+                        master.print_export_logs(f"Processing noise for: {im_name}")
+                    step = "attempting to process color mode for noisy image."
+                    img.noisy_copy = img.handle_write_channel_mode(img.noisy_copy)
+                    step = "attempting to add noise."
+                    img.handle_noise()
+
+                step = "attempting reverse color channels."
+
+                # channel order for wand vs. open cv write functions
+                img.handle_channel_order()
+
+                step = "attempting to save image."
+                # write
+                if master:
+                    master.print_export_logs(f"Saving: {im_name}")
+                img.write_image(master=master, verbose=verbose)
+
+                if master:
+                    progress += step_size
+                    prog_bar.set(value=progress)
+                    write_log_to_file(
+                        "INFO",
+                        f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
+                    )
+                    if task.stopped():
+                        break
+                split, img, warn_mssg, confref.split_color, confref.split_alpha = (
+                    False,
+                    None,
+                    False,
+                    False,
+                    False,
+                    )  
+            except:
+                not_processed.append((im_name, im_path))
+                write_log_to_file(
+                    "ERROR",
+                    f"Ran into an issue while {step}: {im_name} ",
+                )
+                warning_mssg = True if master else False
+                continue
+
 
         tot_time = round(time.time() - start_time, 2)
         write_log_to_file(
@@ -586,10 +598,11 @@ def export_images(
             f"Total time to upscale {count} image(s): {tot_time} seconds for an average of {round(tot_time/count,2)} seconds per image.",
         )
         not_processed = handle_unprocessed_images(not_processed)
-        write_log_to_file(
-            "INFO",
-            f"The following images were not written {not_processed}.",
-        )
+        if not not_processed ==  "all_processed":
+            write_log_to_file(
+                "INFO",
+                f"The following images were not written {not_processed}.",
+            )
 
         # clear GPU memory after export loop finishes
         if export_config["device"] == "cuda": torch.cuda.empty_cache()
