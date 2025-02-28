@@ -6,6 +6,8 @@ from torch import nn as nn
 from torch.nn import functional as F
 from torch.nn import init as init
 from torch.nn.modules.batchnorm import _BatchNorm
+from torch.nn.utils import prune
+
 
 
 @torch.no_grad()
@@ -125,6 +127,13 @@ def pad_reflect(image: np.ndarray, pad_size: int) -> np.ndarray:
 
     return new_img
 
+def prune_model_for_inference(model, pruning_amount=0.2):
+    """Apply L1 unstructured pruning to all Conv2d layers in the model for inference."""
+    # Iterate over all modules in the model and prune Conv2d layers
+    for _, module in model.named_modules():
+        if isinstance(module, torch.nn.Conv2d):
+            prune.l1_unstructured(module, name="weight", amount=pruning_amount)
+    return model
 
 def unpad_image(image: np.ndarray, pad_size: int) -> torch.Tensor:
     return image[pad_size:-pad_size, pad_size:-pad_size, :]
@@ -245,3 +254,4 @@ def stitch_together(
         
     complete_image=complete_image[padding_size : target_shape[0] + padding_size, padding_size : target_shape[1] + padding_size, :]
     return complete_image
+

@@ -1,1 +1,1 @@
-from model.model import RESRGAN
+from model.model import RESRGAN, RESRGAN_TS 
