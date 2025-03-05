@@ -99,10 +99,13 @@ class ExportOptionsFrame(ctk.CTkFrame):
             dynamic_resizing=False,
             command=self.set_scale,
             variable=self.scale,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
+            
+
         )
+
         self.scale_subframe.menu.set(value=ExportConfig.scale)
         self.scale_subframe.menu_tt = Hovertip_Frame(
             anchor_widget=self.scale_subframe.label,
@@ -126,7 +129,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             values=ConfigReference.available_export_formats,
             command=self.set_format,
             variable=self.format,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
         )
@@ -153,7 +156,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             values=ExportConfig.active_compression,
             command=self.set_compression,
             variable=self.cat_compression_value,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
         )
@@ -258,7 +261,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             values=ConfigReference.mipmap_levels,
             command=self.set_mipmaps,
             variable=self.mipmaps,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
         )

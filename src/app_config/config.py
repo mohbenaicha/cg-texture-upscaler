@@ -220,7 +220,7 @@ class ExportConfig:
 
 class GUIConfig:
     master_default_width: int = 765
-    master_default_height: int = 1070
+    master_default_height: int = 1100
     tab_view_height: int = 1062
     tab_view_width: int = 1  # overidden by column frames
     main_listbox_height: int = 35
