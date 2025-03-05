@@ -106,8 +106,10 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         # is the video memory required process it. The memory
         # required for other images is:
         # w x h x scale x (vram for 512x512 image) x (pixel count of 512x512 image)
+
         max_size_to_split = confref.split_sizes[ExportConfig.patch_size][1] #4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
         split = True if size[0]*size[1]*scale*scale > max_size_to_split else False
+
         if split:
             if channel_type == "color":
                 confref.split_color = True

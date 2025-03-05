@@ -297,6 +297,7 @@ def handle_upscaling(
     generator: Generator,
     export_config: dict,
     strategy: UpscalingStrategy,
+
 ) -> torch.Tensor:
     return strategy.upscale(full_image, channel_type, generator, export_config)
 
@@ -323,6 +324,12 @@ def scale_image(
                 else ("no", im_name, "", "")
             )
         ),
+    )
+
+    patch_upscale_strategy = (
+        PatchUpscalingStrategy()
+        if ExportConfig.split_large_image
+        else RegularUpscalingStrategy()
     )
     patch_upscale_strategy = (
         PatchUpscalingStrategy()
@@ -527,6 +534,7 @@ def export_images(
                         if not export_config["export_to_original"]
                         else im_path
                     ),
+
                     img_name=im_name,
                     **export_config,
                 )
@@ -550,6 +558,7 @@ def export_images(
                 step = (
                     "attempting to reconvert the back to the chosen export color depth."
                 )
+
                 # pixel values adjustments based on export color depth, export color space and gamma correction settings
                 img.convert_datatype(input=False)
                 step = "attempting to process export color mode."
@@ -606,6 +615,7 @@ def export_images(
                     False,
                     False,
                 )
+
             except:
                 not_processed.append((im_name, im_path))
                 write_log_to_file(
@@ -614,7 +624,6 @@ def export_images(
                 )
                 warning_mssg = True if master else False
                 continue
-
         tot_time = round(time.time() - start_time, 2)
         write_log_to_file(
             "INFO",
@@ -622,6 +631,7 @@ def export_images(
         )
         not_processed = handle_unprocessed_images(not_processed)
         if not not_processed == "all_processed":
+
             write_log_to_file(
                 "INFO",
                 f"The following images were not written {not_processed}.",

@@ -6,7 +6,6 @@ class ImageContainerInterface:
     def __init__():
         raise NotImplementedError
 
-
 class ImageContainer:
     """
     This class reads images from and writing them to disk. It gets and sets
