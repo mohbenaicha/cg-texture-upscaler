@@ -86,29 +86,6 @@ def handle_alpha(
     return rgb_img
 
 
-def calc_mipmaps(user_choice: str, image: Image):
-    """
-    Calculates the maximum possible mip levels for an image
-    given its dimensions then sets the level to the lesser of
-    (1) the user's choice or (2) the maximum level
-    """
-    if user_choice == "max":
-        user_choice = float(1)
-    else:
-        user_choice = float(user_choice[:-1]) / 100
-    limiting_dim = math.log2(min(image.size))
-    return str(round(user_choice * limiting_dim, 0))
-
-
-def handle_mipmaps(mipmaps: dict, img: torch.Tensor):
-    # if export_config["exrpot_format"] == "dds":
-    if not mipmaps == "none":
-        num_mipmaps = calc_mipmaps(mipmaps, img)
-        img.options["dds:mipmaps"] = num_mipmaps
-    else:
-        img.options["dds:mipmaps"] = "0"
-
-
 def handle_naming(export_config: dict[str, Any], im_name, index):
     id = (str(index) + "_") if export_config["numbering"] else ""
     prefix = export_config["prefix"] + ("_" if export_config["prefix"] != "" else "")

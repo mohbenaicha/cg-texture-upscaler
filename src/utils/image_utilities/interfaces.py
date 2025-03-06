@@ -53,16 +53,3 @@ class IImageUpscaler(ABC):
     def upscale(self, image: np.ndarray, export_config: dict) -> np.ndarray:
         """Upscales an image based on export configuration."""
         pass
-
-class IImageConfig(ABC):
-    """Interface for handling image processing configurations."""
-    
-    @abstractmethod
-    def get_setting(self, key: str) -> Any:
-        """Retrieves a setting from the configuration."""
-        pass
-    
-    @abstractmethod
-    def update_setting(self, key: str, value: Any) -> None:
-        """Updates a setting in the configuration."""
-        pass
