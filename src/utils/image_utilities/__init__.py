@@ -1,1 +1,1 @@
-from utils.image_utilities import ImageConfig
+from utils.image_utilities import ImageConfig, ImageIO

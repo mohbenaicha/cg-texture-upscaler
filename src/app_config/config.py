@@ -269,6 +269,7 @@ class ExportConfig:
     # TODO: implement
     split_large_image: bool = True
     patch_size: str = "3"
+    cli_verbosity: bool = False
 
     @classmethod
     def get(cls, attribute: str):

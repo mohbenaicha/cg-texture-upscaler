@@ -20,37 +20,37 @@ class ImageIO(IImageIO):
 
     def __init__(self, parent: ImageContainer):
         self.parent = parent
+        self.export_config = self.parent.config
 
     def read_image(self, src_path: str, img_name: str) -> None:
         src_path = os.path.join(src_path, img_name)
-        if self.parent.config.src_format in ConfigReference.opencv_formats:
+        if self.export_config.src_format in ConfigReference.opencv_formats:
             self.parent.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
         else:
             self.parent.image = Image.open(src_path)
             self.parent.image = np.array(self.parent.image)
 
         # extract datatype for future use
-        self.parent.config.src_dtype = str(self.parent.image.dtype)
-        self.parent.config.mode = self._get_mode_from_array(self.parent)
-        self.parent.config.length = len(self.parent.config.mode)
+        self.export_config.src_dtype = str(self.parent.image.dtype)
+        self.export_config.mode = self._get_mode_from_array(self.parent)
+        self.export_config.length = len(self.export_config.mode)
         # handle dimensions
         self._handle_dimensions(self.parent)
 
     def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
-        from utils.export_utils import handle_naming
 
-        im_name = handle_naming(
-            self.parent.config.export_naming,
-            self.parent.config.src_image_name,
-            self.parent.config.img_index,
+        im_name = self._handle_naming(
+            self.export_config.export_naming,
+            self.export_config.src_image_name,
+            self.export_config.img_index,
         )
 
-        if self.parent.config.flag_export_to_original:
-            save_path = os.path.join(self.parent.config.trg_path, im_name)
+        if self.export_config.flag_export_to_original:
+            save_path = os.path.join(self.export_config.trg_path, im_name)
         else:
-            save_path = os.path.join(self.parent.config.single_export_location, im_name)
+            save_path = os.path.join(self.export_config.single_export_location, im_name)
 
-        if self.self.parent.config.export_format in ConfigReference.opencv_formats:
+        if self.self.export_config.export_format in ConfigReference.opencv_formats:
             self._write_opencv_image(save_path)
         else:
             self._write_wand_image(save_path, im_name)
@@ -68,7 +68,7 @@ class ImageIO(IImageIO):
         if w_mod != 0 or h_mod != 0:
             write_log_to_file(
                 "WARNING",
-                f"Image {self.parent.config.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
+                f"Image {self.export_config.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
                 "Will affect UV mapping.",
             )
             # check if the width and/or height is a multiple of 2
@@ -76,7 +76,7 @@ class ImageIO(IImageIO):
             shape[1] += 1 if h_mod != 0 else 0
             write_log_to_file(
                 "INFO",
-                f"Reshaped image {self.parent.config.src_image_name} to dimensions {shape[0]}x{shape[1]} to allow for processing.",
+                f"Reshaped image {self.export_config.src_image_name} to dimensions {shape[0]}x{shape[1]} to allow for processing.",
             )
             self.parent.image = cv2.resize(
                 src=self.parent.image, dsize=shape[:2], interpolation=cv2.INTER_LANCZOS4
@@ -89,24 +89,24 @@ class ImageIO(IImageIO):
         """
         determine_if_alpha_is_0(self.parent)
         with wand_image.from_array(self.parent.image) as img:
-            img.format = self.parent.config.export_format
+            img.format = self.export_config.export_format
 
             # .dds automatic vs general manual compression setting
-            if self.parent.config.compression == "automatic":
-                if self.parent.config.alpha_0:
+            if self.export_config.compression == "automatic":
+                if self.export_config.alpha_0:
                     img.compression = "dxt1"
                 else:
                     img.compression = "dxt5"
             else:
                 img.compression = (
-                    self.parent.config.compression
-                    if not self.parent.config.compression == "none"
+                    self.export_config.compression
+                    if not self.export_config.compression == "none"
                     else "no"
                 )
             # bmp specific information TODO: add warning about color mode being changed
             if (
-                self.parent.config.export_format == "bmp"
-                and self.parent.config.compression == "rle"
+                self.export_config.export_format == "bmp"
+                and self.export_config.compression == "rle"
             ):
                 img.type = "palette"
                 write_log_to_file(
@@ -116,18 +116,18 @@ class ImageIO(IImageIO):
                     "To avoid this behaviour in the future, set bmp compression to none.",
                 )
             # the other color types pertain to grayscale/true color
-            elif self.parent.config.export_format != "dds":
-                if self.parent.config.export_mode == "L":
+            elif self.export_config.export_format != "dds":
+                if self.export_config.export_mode == "L":
                     img.type = "grayscale"
                 # elif self.export_mode == 'LA':
                 #     img.type = "grayscalealpha"
-                elif self.parent.config.export_mode == "RGB":
+                elif self.export_config.export_mode == "RGB":
                     img.type = "truecolor"
-                elif self.parent.config.export_mode == "RGBA":
+                elif self.export_config.export_mode == "RGBA":
                     img.type = "truecoloralpha"
 
-            if self.parent.config.mipmaps:
-                self._handle_mipmaps(self.parent.config.mipmaps, img)
+            if self.export_config.mipmaps:
+                self._handle_mipmaps(self.export_config.mipmaps, img)
 
             img.save(filename=save_path)
 
@@ -176,3 +176,12 @@ class ImageIO(IImageIO):
             user_choice = float(user_choice[:-1]) / 100
         limiting_dim = math.log2(min(image.size))
         return str(round(user_choice * limiting_dim, 0))
+
+    def _handle_naming(self, im_name, index):
+        config = self.export_config
+        id = f"{index}_" if config.numbering else ""
+        prefix = f"{config.prefix}_" if config.prefix else ""
+        suffix = f"_{config.suffix}" if config.suffix else ""
+        format = config.export_format
+        im_name = f"{id}{prefix}{im_name[:-4]}{suffix}.{format}"
+        return im_name
