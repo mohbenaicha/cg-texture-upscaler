@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import Any, Tuple
+from typing import Tuple
+import customtkinter as ctk
 
 class IImageIO(ABC):
     """Interface for reading and writing images."""
@@ -11,7 +12,7 @@ class IImageIO(ABC):
         pass
     
     @abstractmethod
-    def write_image(self, image: np.ndarray, trg_path: str, export_config: dict) -> None:
+    def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
         """Writes an image to disk based on export configuration."""
         pass
 

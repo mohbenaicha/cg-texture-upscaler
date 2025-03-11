@@ -8,4 +8,5 @@ class ImageContainer:
         self.config = ImageConfig(**kwargs) # used in setting self.mode, self.proceed_with_split, self.linear_upscale_all_channels, 
         self.alpha: Optional[Union[torch.Tensor, np.ndarray]] = None
         self.color_channels: Optional[Union[torch.Tensor, np.ndarray]] = None
+        self.image: Optional[Union[torch.Tensor, np.ndarray]] = None
         # self.noisy_copy

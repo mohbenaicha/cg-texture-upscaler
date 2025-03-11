@@ -1,47 +1,74 @@
-from utils.image_utilities.interfaces import IImageIO
 import numpy as np
-import cv2, os
+import cv2, os, math
 from PIL import Image
-from typing import Optional, Self
-from utils import confref
+from utils.image_utilities.interfaces import IImageIO
 from utils.logger import write_log_to_file
+from app_config.config import *
+from wand import image as wand_image
+from app_config.config import ConfigReference
+import customtkinter as ctk
+from utils.image_utilities.utils import determine_if_alpha_is_0
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from utils.image_utilities.orchestrator import ImageContainer
+
 
 class ImageIO(IImageIO):
     """Handles reading and writing images."""
-    def read_image(parent, src_path: str, img_name: str) -> np.ndarray:
-        """Reads an image from disk and returns it as a NumPy array."""
-        pass
 
-    def read_and_preprocess_image(parent) -> None:
-        src_path = os.path.join(parent.src_path, parent.src_image_name)
-        if parent.src_format in confref.opencv_formats:
-            parent.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
+    def __init__(self, parent: ImageContainer):
+        self.parent = parent
+
+    def read_image(self, src_path: str, img_name: str) -> None:
+        src_path = os.path.join(src_path, img_name)
+        if self.parent.config.src_format in ConfigReference.opencv_formats:
+            self.parent.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
         else:
-            parent.image = Image.open(src_path)
-            parent.image = np.array(parent.image)
-        # extract datatype for future use
-        parent.src_dtype: str = str(parent.image.dtype)
-        parent.mode: Optional[str] = parent.get_mode_from_array()
-        parent.length = len(parent.mode)
-        # handle dimensions
-        parent.handle_dimensions(
-        )
-    
-    def write_image(parent, image: np.ndarray, trg_path: str, export_config: dict) -> None:
-        """Writes an image to disk based on export configuration."""
-        pass
+            self.parent.image = Image.open(src_path)
+            self.parent.image = np.array(self.parent.image)
 
-    def handle_dimensions(parent) -> None:
+        # extract datatype for future use
+        self.parent.config.src_dtype = str(self.parent.image.dtype)
+        self.parent.config.mode = self._get_mode_from_array(self.parent)
+        self.parent.config.length = len(self.parent.config.mode)
+        # handle dimensions
+        self._handle_dimensions(self.parent)
+
+    def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
+        from utils.export_utils import handle_naming
+
+        im_name = handle_naming(
+            self.parent.config.export_naming,
+            self.parent.config.src_image_name,
+            self.parent.config.img_index,
+        )
+
+        if self.parent.config.flag_export_to_original:
+            save_path = os.path.join(self.parent.config.trg_path, im_name)
+        else:
+            save_path = os.path.join(self.parent.config.single_export_location, im_name)
+
+        if self.self.parent.config.export_format in ConfigReference.opencv_formats:
+            self._write_opencv_image(save_path)
+        else:
+            self._write_wand_image(save_path, im_name)
+        write_log_to_file("INFO", f"Saved {im_name} to {save_path}")
+        if not master and verbose:
+            write_log_to_file(f"\n[INFO] Saved {im_name} to {save_path}\n")
+
+    def _handle_dimensions(self) -> None:
         """
         Reshapes an image by adding a single row and/or column of pixel to make
         a multiple of 2.
         """
-        shape = list(parent.image.shape)
+        shape = list(self.parent.image.shape)
         w_mod, h_mod = shape[0] % 2, shape[1] % 2
         if w_mod != 0 or h_mod != 0:
             write_log_to_file(
                 "WARNING",
-                f"Image {parent.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
+                f"Image {self.parent.config.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
                 "Will affect UV mapping.",
             )
             # check if the width and/or height is a multiple of 2
@@ -49,9 +76,103 @@ class ImageIO(IImageIO):
             shape[1] += 1 if h_mod != 0 else 0
             write_log_to_file(
                 "INFO",
-                f"Reshaped image {parent.src_image_name} to dimensions {shape[0]}x{shape[1]} to allow for processing.",
+                f"Reshaped image {self.parent.config.src_image_name} to dimensions {shape[0]}x{shape[1]} to allow for processing.",
             )
-            parent.image = cv2.resize(
-                src=parent.image, dsize=shape[:2], interpolation=cv2.INTER_LANCZOS4
+            self.parent.image = cv2.resize(
+                src=self.parent.image, dsize=shape[:2], interpolation=cv2.INTER_LANCZOS4
             )
-        return parent
+
+    def _write_wand_image(self, save_path, im_name: str) -> None:
+        """
+        Writes an image using Wand's Image object. Handles compression and color mode.
+        Depends on Image Magick to be installed on user's system.
+        """
+        determine_if_alpha_is_0(self.parent)
+        with wand_image.from_array(self.parent.image) as img:
+            img.format = self.parent.config.export_format
+
+            # .dds automatic vs general manual compression setting
+            if self.parent.config.compression == "automatic":
+                if self.parent.config.alpha_0:
+                    img.compression = "dxt1"
+                else:
+                    img.compression = "dxt5"
+            else:
+                img.compression = (
+                    self.parent.config.compression
+                    if not self.parent.config.compression == "none"
+                    else "no"
+                )
+            # bmp specific information TODO: add warning about color mode being changed
+            if (
+                self.parent.config.export_format == "bmp"
+                and self.parent.config.compression == "rle"
+            ):
+                img.type = "palette"
+                write_log_to_file(
+                    "WARNING",
+                    f"{im_name} saved under {save_path} is converted to paletted color mode"
+                    "to export using rle compression. True color has been indexed to 256 colors."
+                    "To avoid this behaviour in the future, set bmp compression to none.",
+                )
+            # the other color types pertain to grayscale/true color
+            elif self.parent.config.export_format != "dds":
+                if self.parent.config.export_mode == "L":
+                    img.type = "grayscale"
+                # elif self.export_mode == 'LA':
+                #     img.type = "grayscalealpha"
+                elif self.parent.config.export_mode == "RGB":
+                    img.type = "truecolor"
+                elif self.parent.config.export_mode == "RGBA":
+                    img.type = "truecoloralpha"
+
+            if self.parent.config.mipmaps:
+                self._handle_mipmaps(self.parent.config.mipmaps, img)
+
+            img.save(filename=save_path)
+
+    def _get_mode_from_array(self) -> None:
+        """
+        Determines image channel mode from the length of a np.array object using a naive yet practical approach.
+        """
+        shape = self.image.shape
+        if len(shape) == 2:
+            return "L"
+        else:
+            if shape[2] == 4:
+                return "RGBA"
+            elif shape[2] == 3:
+                return "RGB"
+            elif shape[2] == 2:
+                return "LA"
+            else:
+                return None
+
+    def _write_opencv_image(self, save_path: str) -> None:
+        """
+        Writes an image using OpenCV's imwrite function.
+        """
+        cv2.imwrite(filename=save_path, img=self.image, params=self.opencv_write_flgs)
+
+    def _handle_mipmaps(self, mipmaps: str, img):
+        """
+        img: a wand image object
+        """
+        if not mipmaps == "none":
+            num_mipmaps = self._calc_mipmaps(mipmaps, img)
+            img.options["dds:mipmaps"] = num_mipmaps
+        else:
+            img.options["dds:mipmaps"] = "0"
+
+    def _calc_mipmaps(self, user_choice: str, image: Image):
+        """
+        Calculates the maximum possible mip levels for an image
+        given its dimensions then sets the level to the lesser of
+        (1) the user's choice or (2) the maximum level
+        """
+        if user_choice == "max":
+            user_choice = float(1)
+        else:
+            user_choice = float(user_choice[:-1]) / 100
+        limiting_dim = math.log2(min(image.size))
+        return str(round(user_choice * limiting_dim, 0))
