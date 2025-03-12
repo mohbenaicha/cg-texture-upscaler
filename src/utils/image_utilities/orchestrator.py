@@ -1,7 +1,7 @@
 from typing import Optional, Union
 import torch, numpy as np
 from utils.image_utilities.interfaces import IImageContainer
-from utils.image_utilities import ImageConfig, ImageIO
+from utils.image_utilities import ImageConfig, ImageIO, ImageProcessor
 from app_config.config import ExportConfig
 import os
 
@@ -15,18 +15,20 @@ class ImageContainer(IImageContainer):
         self._image: Optional[Union[torch.Tensor, np.ndarray]] = None
         self._config = ImageConfig(**kwargs)
         # self.noisy_copy
-        self.image_io = ImageIO(self)
+        self._image_io = ImageIO(self)
+        self._image_preprocessor = ImageProcessor(self, gamma_adjustment=ExportConfig.gamma_adjustment)
         self.master_frame = None
 
 
         def read_image(self, src_path: str) -> None:
             dir_path, img_name = os.path.split(src_path)
-            self.image_io.read_image(dir_path, img_name)
+            self._image_io.read_image(dir_path, img_name)
         
         def write_image(self, path: str) -> None:
-            self.image_io.write_image(self.master_frame, ExportConfig.cli_verbosity)
+            self._image_io.write_image(self.master_frame, ExportConfig.cli_verbosity)
         
         def process_image(self) -> None:
+            self._image_preprocessor.process_image()
             raise NotImplementedError
 
         @property

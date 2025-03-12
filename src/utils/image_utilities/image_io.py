@@ -18,24 +18,24 @@ if TYPE_CHECKING:
 class ImageIO(IImageIO):
     """Handles reading and writing images."""
 
-    def __init__(self, parent: ImageContainer):
-        self.parent = parent
-        self.export_config = self.parent.config
+    def __init__(self, container: ImageContainer):
+        self.container = container
+        self.export_config = self.container.config
 
     def read_image(self, src_path: str, img_name: str) -> None:
         src_path = os.path.join(src_path, img_name)
         if self.export_config.src_format in ConfigReference.opencv_formats:
-            self.parent.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
+            self.container.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
         else:
-            self.parent.image = Image.open(src_path)
-            self.parent.image = np.array(self.parent.image)
+            self.container.image = Image.open(src_path)
+            self.container.image = np.array(self.container.image)
 
         # extract datatype for future use
-        self.export_config.src_dtype = str(self.parent.image.dtype)
-        self.export_config.mode = self._get_mode_from_array(self.parent)
+        self.export_config.src_dtype = str(self.container.image.dtype)
+        self.export_config.mode = self._get_mode_from_array(self.container)
         self.export_config.length = len(self.export_config.mode)
         # handle dimensions
-        self._handle_dimensions(self.parent)
+        self._handle_dimensions(self.container)
 
     def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
 
@@ -58,37 +58,13 @@ class ImageIO(IImageIO):
         if not master and verbose:
             write_log_to_file(f"\n[INFO] Saved {im_name} to {save_path}\n")
 
-    def _handle_dimensions(self) -> None:
-        """
-        Reshapes an image by adding a single row and/or column of pixel to make
-        a multiple of 2.
-        """
-        shape = list(self.parent.image.shape)
-        w_mod, h_mod = shape[0] % 2, shape[1] % 2
-        if w_mod != 0 or h_mod != 0:
-            write_log_to_file(
-                "WARNING",
-                f"Image {self.export_config.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
-                "Will affect UV mapping.",
-            )
-            # check if the width and/or height is a multiple of 2
-            shape[0] += 1 if w_mod != 0 else 0
-            shape[1] += 1 if h_mod != 0 else 0
-            write_log_to_file(
-                "INFO",
-                f"Reshaped image {self.export_config.src_image_name} to dimensions {shape[0]}x{shape[1]} to allow for processing.",
-            )
-            self.parent.image = cv2.resize(
-                src=self.parent.image, dsize=shape[:2], interpolation=cv2.INTER_LANCZOS4
-            )
-
     def _write_wand_image(self, save_path, im_name: str) -> None:
         """
         Writes an image using Wand's Image object. Handles compression and color mode.
         Depends on Image Magick to be installed on user's system.
         """
-        determine_if_alpha_is_0(self.parent)
-        with wand_image.from_array(self.parent.image) as img:
+        determine_if_alpha_is_0(self.container)
+        with wand_image.from_array(self.container.image) as img:
             img.format = self.export_config.export_format
 
             # .dds automatic vs general manual compression setting
