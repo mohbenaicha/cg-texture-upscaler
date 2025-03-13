@@ -20,37 +20,36 @@ class ImageIO(IImageIO):
 
     def __init__(self, container: ImageContainer):
         self.container = container
-        self.export_config = self.container.config
 
     def read_image(self, src_path: str, img_name: str) -> None:
         src_path = os.path.join(src_path, img_name)
-        if self.export_config.src_format in ConfigReference.opencv_formats:
+        if self.container.config.src_format in ConfigReference.opencv_formats:
             self.container.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
         else:
             self.container.image = Image.open(src_path)
             self.container.image = np.array(self.container.image)
 
         # extract datatype for future use
-        self.export_config.src_dtype = str(self.container.image.dtype)
-        self.export_config.mode = self._get_mode_from_array(self.container)
-        self.export_config.length = len(self.export_config.mode)
+        self.container.config.src_dtype = str(self.container.image.dtype)
+        self.container.config.mode = self._get_mode_from_array(self.container)
+        self.container.config.length = len(self.container.config.mode)
         # handle dimensions
         self._handle_dimensions(self.container)
 
     def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
 
         im_name = self._handle_naming(
-            self.export_config.export_naming,
-            self.export_config.src_image_name,
-            self.export_config.img_index,
+            self.container.config.export_naming,
+            self.container.config.src_image_name,
+            self.container.config.img_index,
         )
 
-        if self.export_config.flag_export_to_original:
-            save_path = os.path.join(self.export_config.trg_path, im_name)
+        if self.container.config.flag_export_to_original:
+            save_path = os.path.join(self.container.config.trg_path, im_name)
         else:
-            save_path = os.path.join(self.export_config.single_export_location, im_name)
+            save_path = os.path.join(self.container.config.single_export_location, im_name)
 
-        if self.self.export_config.export_format in ConfigReference.opencv_formats:
+        if self.self.container.config.export_format in ConfigReference.opencv_formats:
             self._write_opencv_image(save_path)
         else:
             self._write_wand_image(save_path, im_name)
@@ -65,24 +64,24 @@ class ImageIO(IImageIO):
         """
         determine_if_alpha_is_0(self.container)
         with wand_image.from_array(self.container.image) as img:
-            img.format = self.export_config.export_format
+            img.format = self.container.config.export_format
 
             # .dds automatic vs general manual compression setting
-            if self.export_config.compression == "automatic":
-                if self.export_config.alpha_0:
+            if self.container.config.compression == "automatic":
+                if self.container.config.alpha_0:
                     img.compression = "dxt1"
                 else:
                     img.compression = "dxt5"
             else:
                 img.compression = (
-                    self.export_config.compression
-                    if not self.export_config.compression == "none"
+                    self.container.config.compression
+                    if not self.container.config.compression == "none"
                     else "no"
                 )
             # bmp specific information TODO: add warning about color mode being changed
             if (
-                self.export_config.export_format == "bmp"
-                and self.export_config.compression == "rle"
+                self.container.config.export_format == "bmp"
+                and self.container.config.compression == "rle"
             ):
                 img.type = "palette"
                 write_log_to_file(
@@ -92,18 +91,18 @@ class ImageIO(IImageIO):
                     "To avoid this behaviour in the future, set bmp compression to none.",
                 )
             # the other color types pertain to grayscale/true color
-            elif self.export_config.export_format != "dds":
-                if self.export_config.export_mode == "L":
+            elif self.container.config.export_format != "dds":
+                if self.container.config.export_mode == "L":
                     img.type = "grayscale"
                 # elif self.export_mode == 'LA':
                 #     img.type = "grayscalealpha"
-                elif self.export_config.export_mode == "RGB":
+                elif self.container.config.export_mode == "RGB":
                     img.type = "truecolor"
-                elif self.export_config.export_mode == "RGBA":
+                elif self.container.config.export_mode == "RGBA":
                     img.type = "truecoloralpha"
 
-            if self.export_config.mipmaps:
-                self._handle_mipmaps(self.export_config.mipmaps, img)
+            if self.container.config.mipmaps:
+                self._handle_mipmaps(self.container.config.mipmaps, img)
 
             img.save(filename=save_path)
 
@@ -154,7 +153,7 @@ class ImageIO(IImageIO):
         return str(round(user_choice * limiting_dim, 0))
 
     def _handle_naming(self, im_name, index):
-        config = self.export_config
+        config = self.container.config
         id = f"{index}_" if config.numbering else ""
         prefix = f"{config.prefix}_" if config.prefix else ""
         suffix = f"_{config.suffix}" if config.suffix else ""

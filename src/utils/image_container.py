@@ -663,6 +663,7 @@ class ImageContainer:
                 channels = (
                     channels[..., :3] if not "A" in self.export_mode else channels
                 )
+                
         return channels
 
     def handle_channel_order(self) -> Self:

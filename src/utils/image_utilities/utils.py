@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Union
 import numpy as np
+import cv2
 
 if TYPE_CHECKING:
     from utils.image_utilities.orchestrator import ImageContainer
@@ -98,29 +99,9 @@ def normalize_uint(image: np.ndarray, minmax_norm: bool = False) -> None:
         image = (1 - b) * (image - min) / (max - min) - b
 
 
-def convert_datatype_in(color_channels, alpha_channels, config) -> None:
-    """
-    Converts uint8/uint16/float32 to float16/float32 types to be process by the generator.
-    Also converts color space of input to sRGB the generator is trained on sRGB colors and
-    does not linear images well. The it further the color space to linear post-upscale if
-    so desired by the user.
-    """
-
-    if (
-        config.upscale_color_with_generator
-    ):  # if color channels weren't upscaled using the linear algorithm
-        convert_input_image_dtype(config, color_channels)
-    if (
-        config.upscale_alpha_with_generator
-    ):  # if the alpha channel wasn't upscaled using the linear algorithm
-        convert_input_image_dtype(config, alpha_channels)
-
-
-def convert_datatype_out(full_image, config) -> None:
-    full_image = convert_output_image_dtype(config, channels=full_image)
-
-
-def convert_input_image_dtype(config, channels: np.ndarray) -> torch.Tensor:
+def convert_input_image_dtype(
+    color_space, upscale_precision, channels: np.ndarray
+) -> torch.Tensor:
     """
     Convert the input image to a level of float precision that is compatible with torch
     types.
@@ -133,10 +114,10 @@ def convert_input_image_dtype(config, channels: np.ndarray) -> torch.Tensor:
     # to reduce method bloat, the color space sRGB-Linear conversion is subsumed under data type conversion
     # as a technical note, no color space conversion is actually happening since sRGB is a standard RGB color
     # space
-    if "Linear In" in config.color_space:
+    if "Linear In" in color_space:
         channels = np.vectorize(linear_to_sRGB)(channels)
 
-    channels.astype(config.upscale_precision[0], copy=False)
+    channels.astype(upscale_precision, copy=False)
 
 
 def convert_output_image_dtype(
@@ -150,7 +131,6 @@ def convert_output_image_dtype(
     trg_dtype = (
         config.trg_image_dtype if not config.export_format == "exr" else "float32"
     )
-
     # see the method above for details
     if "Linear Out" in config.color_space:
         channels = np.vectorize(sRGB_to_linear)(channels)
@@ -160,3 +140,62 @@ def convert_output_image_dtype(
     return config.output_dtype_mapping[
         f"{str(channels.dtype if not input_dtype else input_dtype)}:{str(trg_dtype if not out_dtype else out_dtype)}"
     ](channels)
+
+
+def convert_RGB_to_grayscale(channels: np.ndarray) -> np.ndarray:
+    """
+    channels: np.array of shape (channels, height, width)
+    Returns a greyscale image of shape (1, height, width)
+    """
+    return np.expand_dims(cv2.cvtColor(channels, cv2.COLOR_BGR2GRAY), 2)
+
+
+def add_alpha(trg_image_dtype: str, channels: np.ndarray, opacity: float):
+    """
+    returns a np.array of shape (channels.shape[0] + 1, height, width) 
+    i.e. with the alpha channel appended to the input channels using the same dtype
+    """
+    alpha = np.ones(channels.shape[:2], dtype=channels.dtype)
+    dtype = (
+        (255 if trg_image_dtype == "uint8" else 65535)
+        if not "float" in trg_image_dtype
+        else 1
+    )
+    alpha = np.expand_dims(alpha, 2) * opacity * dtype
+    return np.concatenate(
+        (channels, alpha),
+        axis=2,
+    ).astype(channels.dtype)
+
+
+def process_output_color_mode(channels: np.ndarray, export_color_mode: str) -> np.ndarray:
+    """
+    channels: np.array of shaep (channels, height, width)
+    export_color_mode: str of the form "RGB", "RGBA", "L", "LA"
+    """
+    no_channels = channels.shape[2]
+
+    if no_channels == 1:  # grey
+        if "L" not in export_color_mode:  # write as RGB
+            channels = np.repeat(channels, 3, axis=2)
+    elif no_channels == 2:  # grey + alpha
+        if "L" in export_color_mode:  # write in greyscale
+            channels = channels[..., :1]
+        else:  # write in RGB
+            temp = np.repeat(channels[:, :, 0:1], 3, axis=2)
+            channels = temp if "A" not in export_color_mode else np.concatenate((temp, channels[:, :, 1:2]), axis=2)
+    elif no_channels == 3:  # RGB
+        if "L" in export_color_mode:  # write in greyscale
+            channels = convert_RGB_to_grayscale(channels)
+    elif no_channels == 4:  # RGBA
+        if "L" in export_color_mode:  # write in greyscale
+            channels = convert_RGB_to_grayscale(channels[..., :3])
+            if "A" in export_color_mode:
+                channels = np.concatenate((channels, channels[..., 3:]), axis=2)
+        else:  # write in RGB
+            channels = channels[..., :3] if "A" not in export_color_mode else channels
+
+    if "A" in export_color_mode and no_channels != 4:
+        channels = add_alpha(channels=channels, opacity=1.0)
+
+    return channels
