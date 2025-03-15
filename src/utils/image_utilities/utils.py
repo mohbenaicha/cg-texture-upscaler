@@ -239,12 +239,19 @@ def unsharp_mask(
         )  # restore the original pixel values where the threshold holds
     return sharpened
 
-def downscale_image(image: np.ndarray):
+def downscale_image(image: np.ndarray, strategy: str = "lanczos4") -> None:
+    strategy_map = {
+        "nearest": cv2.INTER_NEAREST,
+        "linear": cv2.INTER_LINEAR,
+        "area": cv2.INTER_AREA,
+        "cubic": cv2.INTER_CUBIC,
+        "lanczos4": cv2.INTER_LANCZOS4,
+    }
     orig_dtype = image.dtype
     image = cv2.resize(
         src=image.astype("float32" if orig_dtype == "float16" else orig_dtype),
         dsize=tuple(int(dim / 2) for dim in image.shape[:2][::-1]),
-        interpolation=cv2.INTER_LANCZOS4,
+        interpolation=strategy_map[strategy],
     )
     if len(image.shape) == 2:
         image = np.expand_dims(image, 2)

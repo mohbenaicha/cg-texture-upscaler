@@ -1,14 +1,14 @@
 from abc import ABC, abstractmethod
-from typing import Tuple
+from typing import Tuple, TYPE_CHECKING
+from PIL import Image
 import math
 import numpy as np
 import torch
-from app_config.config import ConfigReference as confref
-from utils import ExportConfig, Image
-from model.model import Generator
+from app_config.config import ConfigReference, ExportConfig
 from model.utils import stitch_together, pad_reflect, split_image_into_overlapping_patches
 
-# from utils.export_utils import Generator, confref, handle_image_split
+if TYPE_CHECKING:
+    from model.model import Generator
 
 
 class UpscalingStrategy(ABC):
@@ -107,14 +107,14 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         # required for other images is:
         # w x h x scale x (vram for 512x512 image) x (pixel count of 512x512 image)
 
-        max_size_to_split = confref.split_sizes[ExportConfig.patch_size][1] #4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
+        max_size_to_split = ConfigReference.split_sizes[ExportConfig.patch_size][1] #4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
         split = True if size[0]*size[1]*scale*scale > max_size_to_split else False
 
         if split:
             if channel_type == "color":
-                confref.split_color = True
+                ConfigReference.split_color = True
             else:
-                confref.split_alpha = True
+                ConfigReference.split_alpha = True
             if ExportConfig.split_large_image:
                 pad_size: int = self.handle_padding_size(size)
 
@@ -141,7 +141,7 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         
     def upscale(
             self, 
-            img: Image, 
+            img: Image.Image, 
             channel_type: str, 
             generator: Generator,
             export_config: dict, 

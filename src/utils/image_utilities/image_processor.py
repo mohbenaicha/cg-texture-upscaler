@@ -1,5 +1,8 @@
+from typing import Union, TYPE_CHECKING
 import torch
+from src.gui.frames import ExportFrame
 from utils.image_utilities.interfaces import IImageProcessor
+from utils.image_utilities.image_upscaler import ImageUpscaler
 from utils.image_utilities import (
     determine_if_alpha_is_0,
     sRGB_to_linear,
@@ -12,10 +15,10 @@ from utils.image_utilities import (
 )
 from utils.logger import write_log_to_file
 from app_config.config import ConfigReference
+from model.utils import setup_generator, ModelManager
 from copy import deepcopy
 import cv2
 import numpy as np
-
 
 class ImageProcessor(IImageProcessor):
     def __init__(self, container, gamma_adjustment):
@@ -41,27 +44,42 @@ class ImageProcessor(IImageProcessor):
         self._handle_channel_order()
 
     def process_image(self):
-        self._upscale_image()
-        # scale_image()
-        # calls upscale or downscale based on parent config
-        raise NotImplementedError
+        if self.config.upscale_factor > 1:
+            self._upscale_image()
+        else:
+            self._downscale_image()
 
     def _upscale_image(self, method: str = "resrgan"):
-        if method == "resrgan":
+        if method in ["resrgan", "vgg19", "vgg16"]:
+            if not ModelManager.get_model(method):
+                ModelManager.set_model(
+                    method,
+                    setup_generator(self.config, None)
+                )
             self._resrgan_upscale()
+
         elif method == "linear":
+            # no model setup needed for linear scaling
             self._linear_upscale()
-        # calls resrgan_upscale or linear_upscale based on parent config
 
-    def _downscale_image(self):
+    def _downscale_image(self, method: str = "lanczos4"):
         # downscales image
-        self._handle_downscaling(
-            scale_alpha=self.config.upscale_alpha_with_generator,
-            scale_color=self.config.upscale_color_with_generator,
-        )
+        if method in ["lanczos4", "linear", "cubic", "area", "nearest"]:
+            self._handle_downscaling(
+                scale_alpha=self.config.upscale_alpha_with_generator,
+                scale_color=self.config.upscale_color_with_generator,
+                strategy=method,
+            )
 
-    def _resrgan_upscale():
-        raise NotImplementedError
+    def _resrgan_upscale(self):
+        resrgan_upscaler = ImageUpscaler(
+            self.container,
+            self.master_frame,
+            ModelManager.get_model()
+        )
+        resrgan_upscaler.scale_image(
+            export_config=self.config,
+        )
 
     def _linear_upscale():
         raise NotImplementedError
@@ -503,9 +521,9 @@ class ImageProcessor(IImageProcessor):
                 channels[..., :3] = channels[..., 2::-1]  # Swap BGR <-> RGB
         return channels
 
-    def _handle_downscaling(self, scale_alpha, scale_color) -> np.ndarray:
-        if self.config.scale == 0.5:
+    def _handle_downscaling(self, scale_alpha, scale_color, strategy: str = "lanczos4") -> np.ndarray:
+        if self.config.scale < 1:
             if scale_alpha:
-                downscale_image(image=self.container.alpha)
+                downscale_image(self.container.alpha, strategy)
             if scale_color:
-                downscale_image(image=self.container.color_channels)
+                downscale_image(self.container.color_channels, strategy)

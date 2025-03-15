@@ -1,5 +1,5 @@
-from typing import Tuple
-import math
+from typing import Optional, Tuple, Union, Dict, TYPE_CHECKING
+import math, os
 import numpy as np
 import torch
 from torch import nn as nn
@@ -7,7 +7,12 @@ from torch.nn import functional as F
 from torch.nn import init as init
 from torch.nn.modules.batchnorm import _BatchNorm
 from torch.nn.utils import prune
+from app_config.config import ExportConfig, ConfigReference
+from utils.logger import write_log_to_file
 
+if TYPE_CHECKING:
+    from model import Generator
+    from utils.image_utilities.image_config import ImageConfig
 
 
 @torch.no_grad()
@@ -127,6 +132,7 @@ def pad_reflect(image: np.ndarray, pad_size: int) -> np.ndarray:
 
     return new_img
 
+
 def prune_model_for_inference(model, pruning_amount=0.2):
     """Apply L1 unstructured pruning to all Conv2d layers in the model for inference."""
     # Iterate over all modules in the model and prune Conv2d layers
@@ -134,6 +140,7 @@ def prune_model_for_inference(model, pruning_amount=0.2):
         if isinstance(module, torch.nn.Conv2d):
             prune.l1_unstructured(module, name="weight", amount=pruning_amount)
     return model
+
 
 def unpad_image(image: np.ndarray, pad_size: int) -> torch.Tensor:
     return image[pad_size:-pad_size, pad_size:-pad_size, :]
@@ -251,7 +258,85 @@ def stitch_together(
             :,
         ] = patches[i]
         col += 1
-        
-    complete_image=complete_image[padding_size : target_shape[0] + padding_size, padding_size : target_shape[1] + padding_size, :]
+
+    complete_image = complete_image[
+        padding_size : target_shape[0] + padding_size,
+        padding_size : target_shape[1] + padding_size,
+        :,
+    ]
     return complete_image
 
+
+def setup_generator(
+    export_config: ImageConfig, generator: Generator
+) -> Tuple[Optional[Generator], Union[int, float]]:
+    
+    scale = ConfigReference.scale_map[export_config.scale]
+    if scale != 1:
+        if scale != 0.5:
+            try:
+                if generator == None:
+                    generator = load_model(device=export_config.device, scale=scale)
+
+                if (
+                    export_config.upscale_precision != "high"
+                    and export_config.device != "cpu"
+                ):
+                    generator.half()
+
+                if export_config.device == "cuda":
+                    torch.cuda.set_per_process_memory_fraction(
+                        ConfigReference.limit_vram_value, 0
+                    )
+
+            except (
+                Exception
+            ) as e:  # this will raise an error related to lacking weight (.pth) files or missing Cuda .libs
+                write_log_to_file(
+                    "Error",
+                    f"Failed to process selected image(s) due to an error in setting up the Generator model: \n\t{e}\n",
+                )
+                generator = None
+        else:
+            write_log_to_file(
+                "INFO",
+                f"Downscaling. Chosen scale factor: {scale}",
+            )
+            generator = None
+    else:
+        write_log_to_file(
+            "INFO",
+            f"Skipping upscaling, chosen scale factor: {scale}",
+        )
+        generator = None
+    return generator, scale
+
+
+def load_model(device: str, scale: Union[int, float], load: bool = True) -> Generator:
+    """
+    Loads the Generator model architecture and respective inference weights.
+    """
+    from model import RESRGAN
+
+    # from model import RESRGAN_TS
+
+    model = RESRGAN(device=device, scale=scale)
+    # model = RESRGAN_TS(device=device)
+
+    if load:
+        model.load_weights(os.path.join(ExportConfig.weight_file, f"{scale}x.pth"))
+        # model.load_weights(os.path.join(ExportConfig.weight_file, f"x{scale}_ts.pt"))
+
+    return model.gen
+
+
+class ModelManager:
+    _models = {}
+
+    @classmethod
+    def get_model(cls, model_name: str):
+        return cls._models.get(model_name)
+
+    @classmethod
+    def set_model(cls, model_name: str, model):
+        cls._models[model_name] = model

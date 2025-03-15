@@ -4,7 +4,7 @@ import gc
 import math
 from PIL import ImageFile
 from wand.image import Image
-from utils.patch_upscale_strategy import *
+from src.utils.image_utilities.patch_upscale_strategy import *
 from utils import *
 from utils.logger import write_log_to_file
 from utils.image_container import ImageContainer
@@ -24,25 +24,6 @@ def get_cuda_device_memory(device: int):
     returns float value representing available VRAM in GiB (with increments being in 10s of MiB)
     """
     return round(torch.cuda.get_device_properties(device).total_memory / 1024**3, 2)
-
-
-def load_model(device, scale, load: bool = True):
-    """
-    Loads the Generator model architecture and respective inference weights.
-    """
-    from model import RESRGAN
-    # from model import RESRGAN_TS
-
-
-    model = RESRGAN(device=device, scale=scale)
-    # model = RESRGAN_TS(device=device)
-
-    if load:
-        model.load_weights(os.path.join(ExportConfig.weight_file, f"{scale}x.pth"))
-        # model.load_weights(os.path.join(ExportConfig.weight_file, f"x{scale}_ts.pt"))
-
-    return model.gen
-
 
 def process_export_location(
     export_config: Dict[str, Union[str, int, float, bool]], master: ctk.CTkFrame
@@ -274,7 +255,6 @@ def handle_upscaling(
     generator: Generator,
     export_config: dict,
     strategy: UpscalingStrategy,
-
 ) -> torch.Tensor:
     return strategy.upscale(full_image, channel_type, generator, export_config)
 
@@ -377,7 +357,9 @@ def scale_image(
                             .to(device=device, dtype=torch.float32)
                         )[0]
 
-                img.handle_gamma_correction(1 / export_config["gamma_adjustment"]).recombine_channels()
+                img.handle_gamma_correction(
+                    1 / export_config["gamma_adjustment"]
+                ).recombine_channels()
         except Exception as e:
             if type(e) == torch.cuda.OutOfMemoryError:
                 write_log_to_file(
@@ -509,7 +491,6 @@ def export_images(
                         if not export_config["export_to_original"]
                         else im_path
                     ),
-
                     img_name=im_name,
                     **export_config,
                 )
