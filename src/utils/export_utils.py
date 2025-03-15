@@ -377,10 +377,8 @@ def scale_image(
                             .to(device=device, dtype=torch.float32)
                         )[0]
 
-                img.handle_gamma_correction(1 / export_config["gamma_adjustment"])
-                img.recombine_channels()
+                img.handle_gamma_correction(1 / export_config["gamma_adjustment"]).recombine_channels()
         except Exception as e:
-            print(e)
             if type(e) == torch.cuda.OutOfMemoryError:
                 write_log_to_file(
                     "ERROR",

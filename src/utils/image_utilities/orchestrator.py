@@ -16,8 +16,8 @@ class ImageContainer(IImageContainer):
         self._config = ImageConfig(**kwargs)
         # self.noisy_copy
         self._image_io = ImageIO(self)
-        self._image_preprocessor = ImageProcessor(self, gamma_adjustment=ExportConfig.gamma_adjustment)
-        self.master_frame = None
+        self._image_processor = ImageProcessor(self, gamma_adjustment=ExportConfig.gamma_adjustment)
+        self.master_frame = kwargs.get("master_frame", None)
 
 
         def read_image(self, src_path: str) -> None:
@@ -28,7 +28,9 @@ class ImageContainer(IImageContainer):
             self._image_io.write_image(self.master_frame, ExportConfig.cli_verbosity)
         
         def process_image(self) -> None:
-            self._image_preprocessor.process_image()
+            self._image_processor.preprocess_image()
+            self._image_processor.process_image()
+            self._image_postprocessor.postprocess_image()
             raise NotImplementedError
 
         @property

@@ -199,3 +199,52 @@ def process_output_color_mode(channels: np.ndarray, export_color_mode: str) -> n
         channels = add_alpha(channels=channels, opacity=1.0)
 
     return channels
+
+
+def unsharp_mask(
+    image: np.ndarray,
+    kernel_size: tuple = (5, 5),
+    sigma: float = 1.0,
+    amount: float = 1.0,  #
+    threshold: float = 0,  # 0 to 1
+    input_dtype: str = "uint8",
+):
+    """
+    Return a sharpened version of the image, using an unsharp mask.
+    This is a modified version of Soroush (2019) that incorporates various color depth adjustments and condenses some operations .
+    Comments have been added for clarification of the steps.
+    Credit: Soroush (2019). https://stackoverflow.com/questions/4993082/how-can-i-sharpen-an-image-in-opencv.
+    """
+    scale_ = {
+        "uint8": 255,
+        "uint16": 65535,
+        "float16": 1.0,
+        "float32": 1.0,
+        "float64": 1.0,
+    }
+    blurred = cv2.GaussianBlur(image, kernel_size, sigma)
+    sharpened = (
+        float(amount + 1) * image - float(amount) * blurred
+    )  # combine a ratio of the original image and blurred image; the blurry image is generated using a guassian distribution
+    sharpened = np.clip(sharpened, 0, scale_[input_dtype])
+
+    sharpened = sharpened.astype(input_dtype)
+    if threshold > 0:
+        # don't sharpen pixel values less than the threshold
+        low_contrast_mask = (
+            np.absolute(image - blurred) < threshold * scale_[input_dtype]
+        )  # yields array of true/false values
+        np.copyto(
+            sharpened, image, where=low_contrast_mask
+        )  # restore the original pixel values where the threshold holds
+    return sharpened
+
+def downscale_image(image: np.ndarray):
+    orig_dtype = image.dtype
+    image = cv2.resize(
+        src=image.astype("float32" if orig_dtype == "float16" else orig_dtype),
+        dsize=tuple(int(dim / 2) for dim in image.shape[:2][::-1]),
+        interpolation=cv2.INTER_LANCZOS4,
+    )
+    if len(image.shape) == 2:
+        image = np.expand_dims(image, 2)
