@@ -460,11 +460,16 @@ class ImageProcessor(IImageProcessor):
                 self.container.image = image
 
     def _handle_noise(self) -> None:
+
         if (
             self.config.noise_factor != 0.0
             and not self.config.linear_upscale_all_channels
             and self.config.upscale_factor != 0.5
+            and self.container.master_frame
         ):
+            
+            self.container.master_frame.print_export_logs(f"Processing noise for: {self.container.config.src_image_name}")
+            
             self.container.noisy_copy = process_output_color_mode(
                 self.container.noisy_copy, self.config.export_mode
             )

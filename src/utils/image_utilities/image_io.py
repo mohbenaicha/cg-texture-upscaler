@@ -5,9 +5,8 @@ from utils.image_utilities.interfaces import IImageIO
 from utils.logger import write_log_to_file
 from app_config.config import *
 from wand import image as wand_image
-from app_config.config import ConfigReference
-import customtkinter as ctk
 from utils.image_utilities.utils import determine_if_alpha_is_0
+from utils.export_utils import log_to_interface
 
 from typing import TYPE_CHECKING
 
@@ -36,11 +35,13 @@ class ImageIO(IImageIO):
         # handle dimensions
         self._handle_dimensions(self.container)
 
-    def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
-
+    def write_image(self) -> None:
+        im_name = self.container.config.src_image_name
+        log_to_interface(self.container.master_frame, f"\n[INFO] Saving {im_name}", ExportConfig.cli_verbosity)
+        
         im_name = self._handle_naming(
             self.container.config.export_naming,
-            self.container.config.src_image_name,
+            im_name,
             self.container.config.img_index,
         )
 
@@ -54,8 +55,8 @@ class ImageIO(IImageIO):
         else:
             self._write_wand_image(save_path, im_name)
         write_log_to_file("INFO", f"Saved {im_name} to {save_path}")
-        if not master and verbose:
-            write_log_to_file(f"\n[INFO] Saved {im_name} to {save_path}\n")
+        log_to_interface(self.container.master_frame, f"\n[INFO] Saved {im_name} to {save_path}\n", ExportConfig.cli_verbosity)
+       
 
     def _write_wand_image(self, save_path, im_name: str) -> None:
         """

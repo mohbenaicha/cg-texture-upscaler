@@ -7,6 +7,7 @@ from utils.image_utilities.patch_upscale_strategy import (
     PatchUpscalingStrategy,
     RegularUpscalingStrategy,
 )
+from utils.export_utils import log_to_interface
 from app_config.config import ExportConfig, ConfigReference
 
 if TYPE_CHECKING:
@@ -16,7 +17,11 @@ if TYPE_CHECKING:
 
 
 class ImageUpscaler(IImageUpscaler):
+    """
+    SoP class for upscaling images. Still not completely decoupled from the GAN-based upscaling method.
+    """
 
+    # TODO: decouple further in future iterations
     def __init__(
         self,
         image_container: ImageContainer,
@@ -62,10 +67,8 @@ class ImageUpscaler(IImageUpscaler):
             try:
                 # determine sort cuda memory allocation if gpu-based upscaling is chosen
                 device = export_config["device"]
-                if self.master_frame:
-                    self.master_frame.print_export_logs(
-                        f"Upscaling {export_config.src_image_name}"
-                    )
+                log_to_interface(self.master_frame, f"Upscaling {export_config.src_image_name}")
+                
                 with torch.inference_mode():
                     if device == "cuda":
                         with torch.autocast(
@@ -117,7 +120,7 @@ class ImageUpscaler(IImageUpscaler):
                                         .to(export_config["device"])
                                     )[0]
 
-                    else:
+                    else:  # float32 precision cpu upscaling
                         if self.image_config.upscale_color_with_generator:
                             self.contianer.color_channels = self.generator(
                                 ConfigReference.inference_transform(

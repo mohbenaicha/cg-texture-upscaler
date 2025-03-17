@@ -1,10 +1,9 @@
 from __future__ import annotations
 from typing import TYPE_CHECKING
 import gc
-import math
 from PIL import ImageFile
 from wand.image import Image
-from src.utils.image_utilities.patch_upscale_strategy import *
+from utils.image_utilities.patch_upscale_strategy import *
 from utils import *
 from utils.logger import write_log_to_file
 from utils.image_container import ImageContainer
@@ -18,13 +17,7 @@ if TYPE_CHECKING:
     from gui.frames.export_frame import ExportThread, ExportFrame
 
 
-def get_cuda_device_memory(device: int):
-    """
-    Retrieves memory available on respective cuda device
-    returns float value representing available VRAM in GiB (with increments being in 10s of MiB)
-    """
-    return round(torch.cuda.get_device_properties(device).total_memory / 1024**3, 2)
-
+# TODO: deprecate
 def process_export_location(
     export_config: Dict[str, Union[str, int, float, bool]], master: ctk.CTkFrame
 ):
@@ -40,7 +33,7 @@ def process_export_location(
         process = False
 
 
-# TODO: implement
+# TODO: deprecate
 def handle_alpha(
     rgb_img: Image, rgb_alpha, optimize: bool, bl: int, br: float, co: float, file: str
 ):
@@ -66,7 +59,7 @@ def handle_alpha(
     # merge alpha channel with RGB
     return rgb_img
 
-
+# TODO: deprecate
 def handle_naming(export_config: dict[str, Any], im_name, index):
     id = (str(index) + "_") if export_config["numbering"] else ""
     prefix = export_config["prefix"] + ("_" if export_config["prefix"] != "" else "")
@@ -75,7 +68,7 @@ def handle_naming(export_config: dict[str, Any], im_name, index):
     im_name = f"{id}{prefix}{im_name[:-4]}{suffix}.{format}"
     return im_name
 
-
+# TODO: deprecate
 def handle_dimensions(img: imTypes, im_name: str, im_type: str) -> imTypes:
     if im_type == "Numpy":
         shape = list(img.shape)
@@ -114,7 +107,7 @@ def handle_unprocessed_images(unprocessed_list):
             ]
         )
 
-
+# TODO: deprecate
 def unsharp_mask(
     image: np.ndarray,
     kernel_size: tuple = (5, 5),
@@ -153,7 +146,7 @@ def unsharp_mask(
         )  # restore the original pixel values where the threshold holds
     return sharpened
 
-
+# TODO: deprecate
 def handle_noise(
     noisy_image: np.ndarray,
     denoised_image: np.ndarray,
@@ -179,7 +172,7 @@ def handle_noise(
     img = noisy_image * (noise_factor) + denoised_image * scale_ * (1 - noise_factor)
     return img / scale_
 
-
+# TODO: deprecate
 def handle_downscaling(image: np.ndarray) -> np.ndarray:
     orig_dtype = image.dtype
     image = cv2.resize(
@@ -191,7 +184,7 @@ def handle_downscaling(image: np.ndarray) -> np.ndarray:
         image = np.expand_dims(image, 2)
     return image
 
-
+# TODO: deprecate
 def handle_channel_order(
     img: np.array, read_format: str, write_format: str
 ) -> np.ndarray:
@@ -203,7 +196,7 @@ def handle_channel_order(
             img[..., :3] = img[..., 2::-1]
     return img
 
-
+# TODO: deprecate
 def setup_generator(
     export_config: Union[Dict[str, Union[str, int, bool]], None], generator: Generator
 ):
@@ -248,7 +241,7 @@ def setup_generator(
         generator = None
     return generator, scale
 
-
+# TODO: deprecate
 def handle_upscaling(
     full_image: np.ndarray,
     channel_type: str,
@@ -259,7 +252,8 @@ def handle_upscaling(
     return strategy.upscale(full_image, channel_type, generator, export_config)
 
 
-def scale_image(
+# TODO: deprecate
+def scale_image(  
     master: Union[ExportFrame, None],
     generator: Union[Generator, None],
     export_config: dict,
@@ -384,6 +378,25 @@ def scale_image(
             1 / export_config["gamma_adjustment"]
         ).recombine_channels()
 
+def log_to_interface(gui: Union[ExportFrame, None] = None, msg: str = "", verbose: bool = False, print_img_index: bool = False):
+    if gui:
+        gui.print_export_logs(msg)
+        if print_img_index:
+            gui.print_image_index(msg)
+    elif verbose:
+        print(msg)
+    
+
+class ProcessingStep:
+    def __init__(self, step: str = ""):
+        self.step = step
+
+    def update_step(self, new_step: str):
+        self.step = new_step
+
+    def __str__(self):
+        return self.step
+
 
 def export_images(
     master: Union[ExportFrame, None],
@@ -396,7 +409,6 @@ def export_images(
     task: Union[ExportThread, None],
 ):
     # 1. Set up variables/objects
-
     global warning_mssg, process, scale, max_vram, img, not_processed
     try:
         if export_indices == "all":
@@ -423,6 +435,7 @@ def export_images(
 
     # 3. Process image
     if process:
+        step = ProcessingStep("setting up upscaling model.")
         try:
             not_processed = []
             tot_images = len(export_indices)
@@ -471,18 +484,17 @@ def export_images(
             try:
                 count += 1
                 im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-                fp, step = os.path.join(im_path, im_name), "reading image."
+                fp = os.path.join(im_path, im_name)
+                step.update_step(f"Reading image: {im_name}")
+
                 sub_time_start = time.time()
 
-                if master:
-                    master.print_image_index(f"Processed/Total: {count-1}/{tot_images}")
-                if not master and verbose:
-                    print(f"\nAttempting to process file:\n\t {fp}\n")
+                log_to_interface(master, f"Processed/Total: {count-1}/{tot_images}", verbose, True)
+                
+                log_to_interface(master, f"\nAttempting to process file:\n\t {fp}\n", verbose)
 
-                if master:
-                    master.print_export_logs(f"Preprocessing: {im_name}")
+                step.update_step("setting up image for processing.")
 
-                step = "setting up image for processing"
                 img = ImageContainer(
                     img_index=i,
                     src_path=im_path,
@@ -492,37 +504,38 @@ def export_images(
                         else im_path
                     ),
                     img_name=im_name,
+                    step=step,
                     **export_config,
                 )
+                log_to_interface(master, f"Preprocessing: {im_name}", verbose)
 
-                step = "attempting to scale linearly."
+                step.update_step("attempting to scale linearly.")
                 img.check_all_values_equivalent()
-                step = "attempting to split color and alpha channels for separate processing."
+                step.update_step("attempting to split color and alpha channels for separate processing.")
                 img.split_image()
-                step = "attempting to correct gamma."
+                step.update_step("attempting to correct gamma.")
                 img.handle_gamma_correction(export_config["gamma_adjustment"])
-                step = "converting the data type before upscaling."
+                step.update_step("converting the data type before upscaling.")
                 img.convert_datatype(input=True)
-                step = "attempting to upscale the image with the chosen model"
+                step.update_step("attempting to upscale the image with the chosen model.")
+
                 scale_image(
                     master=master,
                     generator=generator,
                     export_config=export_config,
                     im_name=im_name,
                 )  # recombines color and alpha (if any) channel into a single array
-
-                step = (
-                    "attempting to reconvert the back to the chosen export color depth."
-                )
+                step.update_step("attempting to reconvert the back to the chosen export color depth.")
 
                 # pixel values adjustments based on export color depth, export color space and gamma correction settings
                 img.convert_datatype(input=False)
-                step = "attempting to process export color mode."
+                step.update_step("attempting to process export color mode.")
+
                 # write color mode (RGB, RGBA, L, LA)
                 # exporting images as .dds forced RGBA
                 img.image = img.handle_write_channel_mode(img.image)
+                step.update_step("applying the dds mip level workaround for the .dds image export format.")
 
-                step = "applying the dds mip level workaround for the .dds image export format."
                 # dds mipmap fix
                 if export_config["export_format"] == "dds":
                     img.apply_dds_mipmap_fix()
@@ -537,22 +550,21 @@ def export_images(
                         not img.upscale_factor == 0.5
                     )  # does not support adding noise while downscaling
                 ):
-                    if master:
-                        master.print_export_logs(f"Processing noise for: {im_name}")
-                    step = "attempting to process color mode for noisy image."
+                    log_to_interface(master, f"Processing noise for: {im_name}", verbose)
+                    step.update_step("attempting to process color mode for noisy image.")
                     img.noisy_copy = img.handle_write_channel_mode(img.noisy_copy)
-                    step = "attempting to add noise."
+
                     img.handle_noise()
 
-                step = "attempting reverse color channels."
+                step.update_step("attempting reverse color channels for image writing.")
 
                 # channel order for wand vs. open cv write functions
                 img.handle_channel_order()
 
-                step = "attempting to save image."
+                step.update_step("attempting to save image.")
+
                 # write
-                if master:
-                    master.print_export_logs(f"Saving: {im_name}")
+                log_to_interface(master, f"Saving: {im_name}", verbose)
                 img.write_image(master=master, verbose=verbose)
 
                 if master:
@@ -587,7 +599,6 @@ def export_images(
         )
         not_processed = handle_unprocessed_images(not_processed)
         if not not_processed == "all_processed":
-
             write_log_to_file(
                 "INFO",
                 f"The following images were not written {not_processed}.",

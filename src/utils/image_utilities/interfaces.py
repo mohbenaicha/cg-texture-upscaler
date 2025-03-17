@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING
 import customtkinter as ctk
 
 if TYPE_CHECKING:
-    import torch 
+    import torch
 
 
 class IImageIO(ABC):
@@ -16,7 +16,7 @@ class IImageIO(ABC):
         pass
 
     @abstractmethod
-    def write_image(self, master: ctk.CTkFrame, verbose: bool) -> None:
+    def write_image(self) -> None:
         """Writes an image to disk based on export configuration."""
         pass
 
@@ -69,6 +69,16 @@ class IImageContainer(ABC):
         pass
 
     @abstractmethod
+    def preprocess_image(self) -> None:
+        """Processes the image, including dimensions, color mode, space, depth and gamma."""
+        pass
+
+    @abstractmethod
+    def postprocess_image(self) -> None:
+        """Postprocesses the image including color mode, space, depth, gamma and noise."""
+        pass
+
+    @abstractmethod
     def process_image(self) -> None:
-        """Processes the image, could call preprocess, upscale, and postprocess."""
+        """Processes the image including upscaling, downscaling, etc."""
         pass
