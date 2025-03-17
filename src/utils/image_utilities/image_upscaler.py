@@ -57,16 +57,13 @@ class ImageUpscaler(IImageUpscaler):
             if ExportConfig.split_large_image
             else RegularUpscalingStrategy()
         )
-        patch_upscale_strategy = (
-            PatchUpscalingStrategy()
-            if ExportConfig.split_large_image
-            else RegularUpscalingStrategy()
-        )
+
 
         if self.generator:
             try:
                 # determine sort cuda memory allocation if gpu-based upscaling is chosen
                 device = export_config["device"]
+                self.container.step.update_step(f"attempting to upscale image according to {0}.".format("'split image into patches'" if ExportConfig.split_large_image else "'full image upscaling'"))
                 log_to_interface(self.master_frame, f"Upscaling {export_config.src_image_name}")
                 
                 with torch.inference_mode():
@@ -149,4 +146,3 @@ class ImageUpscaler(IImageUpscaler):
                         f"Could not process {export_config.src_image_name}. The program ran into an unhandled error. \n (path: {self.image_config.trg_path})."
                         f"ERROR: \n\n{e}\n\n",
                     )
-                warning_mssg = True if self.master_frame else False

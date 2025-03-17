@@ -59,12 +59,12 @@ class IImageContainer(ABC):
     """Interface for an image container class that orchestrates image transformation pipeline"""
 
     @abstractmethod
-    def read_image(self, path: str) -> None:
+    def read_image(self) -> None:
         """Reads the image from disk."""
         pass
 
     @abstractmethod
-    def write_image(self, path: str) -> None:
+    def write_image(self) -> None:
         """Writes the image to disk."""
         pass
 

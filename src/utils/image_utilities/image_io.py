@@ -32,11 +32,11 @@ class ImageIO(IImageIO):
         self.container.config.src_dtype = str(self.container.image.dtype)
         self.container.config.mode = self._get_mode_from_array(self.container)
         self.container.config.length = len(self.container.config.mode)
-        # handle dimensions
-        self._handle_dimensions(self.container)
 
     def write_image(self) -> None:
         im_name = self.container.config.src_image_name
+        
+        self.container.step.update_step("attempting to save image.")
         log_to_interface(self.container.master_frame, f"\n[INFO] Saving {im_name}", ExportConfig.cli_verbosity)
         
         im_name = self._handle_naming(
