@@ -1,10 +1,6 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import TYPE_CHECKING
-import customtkinter as ctk
-
-if TYPE_CHECKING:
-    import torch
+import torch
 
 
 class IImageIO(ABC):
@@ -50,7 +46,7 @@ class IImageUpscaler(ABC):
     """Interface for image upscaling."""
 
     @abstractmethod
-    def scale_image(self, export_config: dict) -> torch.Tensor:
+    def scale_image(self) -> torch.Tensor:
         """Upscales an image based on export configuration."""
         pass
 

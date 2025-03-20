@@ -1,14 +1,14 @@
 from typing import TYPE_CHECKING, Union
 import numpy as np
 import cv2
+import torch
 
 if TYPE_CHECKING:
     from utils.image_utilities.orchestrator import ImageContainer
-    import torch
 from app_config.config import ConfigReference
 
 
-def determine_if_alpha_is_0(image_conatiner: ImageContainer) -> None:
+def determine_if_alpha_is_0(image_conatiner: 'ImageContainer') -> None:
     # TODO: automatic not working consistently
     if ("A" in image_conatiner.config.mode) and (
         image_conatiner.config.compression == "automatic"
@@ -91,12 +91,17 @@ def normalize_uint(image: np.ndarray, minmax_norm: bool = False) -> None:
     Normalize value in a np.array between 0 and 1 or -1 and 1
     """
     dtype = image.dtype
+    print("image.dtype in normalize_uint: ", image.dtype)
     if not minmax_norm:
-        image /= 255 if dtype == "uint8" else 65535
+
+        image = image / (255 if dtype == "uint8" else 65535)
+        image = image
     else:
         min, max = image.min(), image.max()
         b = 0
         image = (1 - b) * (image - min) / (max - min) - b
+    print("image.dtype after normalize_uint: ", image.dtype)
+    return image
 
 
 def convert_input_image_dtype(
@@ -106,10 +111,9 @@ def convert_input_image_dtype(
     Convert the input image to a level of float precision that is compatible with torch
     types.
     """
-    if channels.dtype == np.uint8:
-        normalize_uint(channels)
-    elif channels.dtype == np.uint16:
-        normalize_uint(channels)
+    if channels.dtype == np.uint8 or channels.dtype == np.uint16:
+        print("conditions fulfilled")
+        channels = normalize_uint(channels)
 
     # to reduce method bloat, the color space sRGB-Linear conversion is subsumed under data type conversion
     # as a technical note, no color space conversion is actually happening since sRGB is a standard RGB color
@@ -117,7 +121,7 @@ def convert_input_image_dtype(
     if "Linear In" in color_space:
         channels = np.vectorize(linear_to_sRGB)(channels)
 
-    channels.astype(upscale_precision, copy=False)
+    return channels.astype(upscale_precision)
 
 
 def convert_output_image_dtype(
@@ -255,3 +259,27 @@ def downscale_image(image: np.ndarray, strategy: str = "lanczos4") -> None:
     )
     if len(image.shape) == 2:
         image = np.expand_dims(image, 2)
+
+
+def upscale_linear(
+    channels: str,
+    factor: int,
+    fill_value: Union[np.uint8, np.uint32, np.float32],
+    upscale_precision,
+) -> np.ndarray:
+    """
+    If all values across image channels are the same, fill a new array with that value.
+    """
+    w, h, c = (
+        (channels.shape) if len(channels.shape) == 3 else (*channels.shape, None)
+    )
+
+    return (
+        np.ones(
+            shape=(int(w * factor), int(h * factor))
+            if not c
+            else (int(w * factor), int(h * factor), c),
+            dtype=channels.dtype,
+        )
+        * fill_value
+    ).astype(upscale_precision[0])

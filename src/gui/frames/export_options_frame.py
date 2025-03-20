@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 from tkinter import *
 import customtkinter as ctk
 import math
@@ -8,6 +7,7 @@ from app_config.config import ExportConfig, ConfigReference, GUIConfig
 from utils.events import *
 import gui.tooltips.tooltip_text as ttt
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from gui.frames import TkListbox, AdditionalOptionsFrame
 
@@ -16,8 +16,8 @@ class ExportOptionsFrame(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         # options variable definitions
-        self.lb_frame: TkListbox = kwargs.get("lb_frame")
-        self.addit_sett_subframe: AdditionalOptionsFrame = kwargs.get(
+        self.lb_frame: 'TkListbox' = kwargs.get("lb_frame")
+        self.addit_sett_subframe: 'AdditionalOptionsFrame' = kwargs.get(
             "addit_sett_subframe"
         )
         self.height: int = kwargs.get("height")

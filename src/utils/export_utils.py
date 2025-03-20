@@ -5,7 +5,7 @@ from PIL import ImageFile
 from wand.image import Image
 from utils.image_utilities.patch_upscale_strategy import *
 from utils import *
-from utils.logger import write_log_to_file
+from utils.logger import write_log_to_file, log_to_interface
 from utils.image_container import ImageContainer
 from utils.image_utilities.orchestrator import ImageContainer as Container
 
@@ -379,13 +379,6 @@ def scale_image(
             1 / export_config["gamma_adjustment"]
         ).recombine_channels()
 
-def log_to_interface(gui: Union[ExportFrame, None] = None, msg: str = "", verbose: bool = False, print_img_index: bool = False):
-    if gui:
-        gui.print_export_logs(msg)
-        if print_img_index:
-            gui.print_image_index(msg)
-    elif verbose:
-        print(msg)
     
 
 class ProcessingStep:
@@ -402,7 +395,7 @@ class ProcessingStep:
         return self.step
 
 
-def export_images(
+def _export_images(
     master: Union[ExportFrame, None],
     export_config: Union[Dict[str, Union[str, int, bool]], None],
     gen: Union[Generator, None],
@@ -489,7 +482,7 @@ def export_images(
                 count += 1
                 im_name, im_path = cache_copy[0][i], cache_copy[1][i]
                 fp = os.path.join(im_path, im_name)
-                step.update_step(f"Reading image: {im_name}")
+                step.update_step(f"reading image: {im_name}")
 
                 sub_time_start = time.time()
 
@@ -638,10 +631,9 @@ def export_images(
         )
 
 
-def __export_images(
+def export_images(
     master: Union[ExportFrame, None],
     export_config: Union[Dict[str, Union[str, int, bool]], None],
-    gen: Union[Generator, None],
     export_indices: Union[List[int], None],
     prog_bar: Union[ctk.CTkProgressBar, None],
     stop_export_button: Union[ctk.CTkButton, None],
@@ -649,7 +641,6 @@ def __export_images(
     task: Union[ExportThread, None],
 ):
     # 1. Set up variables/objects
-    global warning_mssg, process, scale, max_vram, container, not_processed
     try:
         if export_indices == "all":
             export_indices = list(range(0, len(im_cache[0])))
@@ -678,7 +669,7 @@ def __export_images(
         step = ProcessingStep("setting up upscaling model.")
         try:
             not_processed = []
-            tot_images = len(export_indices)
+            total_images = len(export_indices)
 
             if not export_config["device"] == "cpu":
                 # clean up unused objects, free up unused GPU memory cached by torch but does not release memory back to the OS, resets the peak memory usage tracker for the current session
@@ -690,13 +681,6 @@ def __export_images(
                 confref.split_color = False
                 confref.split_alpha = False
 
-            # determine maximum vram available once before the loop to batch process images
-            if export_config["device"] == "cuda":
-                max_vram = (
-                    torch.cuda.get_device_properties(0).total_memory / (1024**3)
-                    if ExportConfig.device == "cuda"
-                    else None
-                )
 
             # 3. b) Setup UI and processing metrics
 
@@ -704,7 +688,7 @@ def __export_images(
             if master:
                 prog_bar.grid(row=1, column=0, sticky="w", padx=7, pady=2)
                 stop_export_button.grid(row=2, column=0, sticky="we", padx=7, pady=2)
-                step_size = 1 / tot_images
+                step_size = 1 / total_images
 
             start_time = time.time()
             count, progress = 0, 0
@@ -722,11 +706,11 @@ def __export_images(
                 count += 1
                 im_name, im_path = cache_copy[0][i], cache_copy[1][i]
                 fp = os.path.join(im_path, im_name)
-                step.update_step(f"Reading image: {im_name}")
+                step.update_step(f"reading image: {im_name}")
 
                 sub_time_start = time.time()
 
-                log_to_interface(master, f"Processed/Total: {count-1}/{tot_images}", verbose, True)
+                log_to_interface(master, f"Processed/Total: {count-1}/{total_images}", verbose, True)
                 
                 log_to_interface(master, f"\nAttempting to process file:\n\t {fp}\n", verbose)
 
@@ -769,7 +753,7 @@ def __export_images(
                     )
                     if task.stopped():
                         break
-                split, container, warn_mssg, confref.split_color, confref.split_alpha = (
+                container, warn_mssg, confref.split_color, confref.split_alpha = (
                     False,
                     None,
                     False,
@@ -777,11 +761,12 @@ def __export_images(
                     False,
                 )
 
-            except:
+            except Exception as e:
+                
                 not_processed.append((im_name, im_path))
                 write_log_to_file(
                     "ERROR",
-                    f"Ran into an issue while {step}: {im_name} ",
+                    f"Ran into an issue while {step}: {im_name} \n\t {e}",
                 )
                 warning_mssg = True if master else False
                 continue

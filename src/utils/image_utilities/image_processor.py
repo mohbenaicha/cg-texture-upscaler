@@ -1,7 +1,11 @@
 import torch
+from copy import deepcopy
+import cv2
+import numpy as np
+from typing import TYPE_CHECKING, Optional
 from utils.image_utilities.interfaces import IImageProcessor
 from utils.image_utilities.image_upscaler import ImageUpscaler
-from utils.image_utilities import (
+from utils.image_utilities.utils import (
     determine_if_alpha_is_0,
     sRGB_to_linear,
     apply_gamma_correction,
@@ -10,27 +14,60 @@ from utils.image_utilities import (
     process_output_color_mode,
     unsharp_mask,
     downscale_image,
+    upscale_linear,
 )
 from utils.logger import write_log_to_file
 from app_config.config import ConfigReference
 from model.utils import setup_generator, ModelManager
-from copy import deepcopy
-import cv2
-import numpy as np
+
+if TYPE_CHECKING:
+    from utils.image_utilities.orchestrator import ImageContainer
+
 
 class ImageProcessor(IImageProcessor):
-    def __init__(self, container, gamma_adjustment):
+    def __init__(self, container: "ImageContainer", gamma_adjustment):
         self.container = container  # orchestrator/container that has image and config
         self.config = self.container.config  # reference to the config object
+        print("ImageProcessor received config as: ", self.config)
         self.gamma_adjustment = gamma_adjustment
 
     def preprocess_image(self):
+        print("Image dtype before preprocess", self.container.image.dtype)
+        print("Image type: ", type(self.container.image))
         self._handle_dimensions()
+        print("image.dtype before check all values", self.container.image.dtype)
+        print("Image type: ", type(self.container.image))
+
         self._check_all_values_equivalent()
+        print("Dtype after check all values", self.container.image.dtype)
+        print("Image type: ", type(self.container.image))
+
         self._preprocess_noisy_image()
+        print("Image type: ", type(self.container.image))
+
         self._split_image()
+        print("Dtype after split image")
+        try:
+            print(self.container.color_channels.dtype)
+            print(self.container.alpha.dtype)
+
+        except:
+            pass
+        self._handle_channel_order(self.container.color_channels)
+        print("Dtype after handle channel order")
+        try:
+            print(self.container.color_channels.dtype)
+            print(self.container.alpha.dtype)
+        except:
+            pass
         self._handle_gamma(self.gamma_adjustment)  # handle_gamma_correction
+        print("Dtype after handle gamma")
+        print(self.container.color_channels.dtype)
+        print(self.container.alpha.dtype)
         self._convert_dtype(input=True)
+        print("Dtype after convert dtype")
+        print(self.container.color_channels.dtype)
+        print(self.container.alpha.dtype)
 
     def postprocess_image(self):
         self._handle_gamma(1 / self.gamma_adjustment)
@@ -43,19 +80,21 @@ class ImageProcessor(IImageProcessor):
 
     def process_image(self):
         if self.config.upscale_factor > 1:
-            self.container.step.update_step("attempting to upscale the image with the chosen model.")
+            self.container.step.update_step(
+                "attempting to upscale the image with the chosen model"
+            )
             self._upscale_image()
         else:
-            self.container.step.update_step("attempting to downscale image using chosen method.")
+            self.container.step.update_step(
+                "attempting to downscale image using chosen method"
+            )
             self._downscale_image()
 
     def _upscale_image(self, method: str = "resrgan"):
         if method in ["resrgan", "vgg19", "vgg16"]:
+            print("Upscale method: ", method)
             if not ModelManager.get_model(method):
-                ModelManager.set_model(
-                    method,
-                    setup_generator(self.config, None)
-                )
+                ModelManager.set_model(method, setup_generator(self.config, None)[0])
             self._resrgan_upscale()
 
         elif method == "linear":
@@ -74,12 +113,12 @@ class ImageProcessor(IImageProcessor):
     def _resrgan_upscale(self):
         resrgan_upscaler = ImageUpscaler(
             self.container,
-            self.master_frame,
-            ModelManager.get_model()
+            self.container.master_frame,
+            ModelManager.get_model("resrgan"),
         )
-        resrgan_upscaler.scale_image(
-            export_config=self.config,
-        )
+        print("RESRGAN setup successfully, dtype: ", type(ModelManager.get_model("resrgan")))
+
+        resrgan_upscaler.scale_image()
 
     def _linear_upscale():
         raise NotImplementedError
@@ -113,14 +152,14 @@ class ImageProcessor(IImageProcessor):
 
     def _check_all_values_equivalent(self):
         self.container.step.update_step("attempting to scale linearly.")
-        
+
         if self.container.image.max() == self.container.image.min():
             write_log_to_file(
                 "WARNING",
                 f"Using linear scaling to scale image {self.config.src_image_name}'s channels.",
             )
             determine_if_alpha_is_0()
-            self.container.image = self.upscale_linear(
+            self.container.image = upscale_linear(
                 self.container.image,
                 self.config.upscale_factor,
                 self.container.image.max(),
@@ -186,7 +225,9 @@ class ImageProcessor(IImageProcessor):
         Separates alpha from color channels creating two new members to represent the original image object.
         Also saves the images depth (data type) and removes the original image object from memory.
         """
-        self.container.step.update_step("attempting to split color and alpha channels for separate processing.")
+        self.container.step.update_step(
+            "attempting to split color and alpha channels for separate processing."
+        )
 
         (
             self.container.config.upscale_color_with_generator,
@@ -230,7 +271,7 @@ class ImageProcessor(IImageProcessor):
                         "WARNING",
                         f"Using linear scaling to scale image {self.config.src_image_name}'s alpha channel.",
                     )
-                    self.container.alpha = self.upscale_linear(  # todo
+                    self.container.alpha = upscale_linear(  # todo
                         self.container.alpha,
                         self.config.upscale_factor,
                         alpha_max,
@@ -241,7 +282,7 @@ class ImageProcessor(IImageProcessor):
                 else:  # prepare alpha channel to be fed to the Generator
                     self.container.alpha = (
                         np.repeat(self.container.alpha, repeats=3, axis=2)
-                        if not self.upscale_factor in [0.5, 1]
+                        if not self.config.upscale_factor in [0.5, 1]
                         else self.container.alpha
                     )
             # exctract color information (rgb/grayscale)
@@ -270,7 +311,7 @@ class ImageProcessor(IImageProcessor):
                     "WARNING",
                     f"Using linear scaling to scale image {self.config.src_image_name}'s color channel(s).",
                 )
-                self.container.color_channels = self.upscale_linear(
+                self.container.color_channels = upscale_linear(
                     self.container.color_channels,
                     self.config.upscale_factor,
                     color_max,
@@ -303,7 +344,9 @@ class ImageProcessor(IImageProcessor):
         If an alpha channel exists and is 3 channels (generator output), channels are
         combined into a single channel based on a fixed weighting
         """
-        self.container.step.update_step("attempting to recombines color and alpha channels.")
+        self.container.step.update_step(
+            "attempting to recombine color and alpha channels"
+        )
         t_alpha, t_color = type(self.container.alpha), type(
             self.container.color_channels
         )
@@ -371,7 +414,7 @@ class ImageProcessor(IImageProcessor):
                     if self.config.device == "cuda"
                     else self.container.color_channels.to(dtype=torch.float32)
                 )
-                self.color_channels = self.color_channels.numpy()
+                self.container.color_channels = self.container.color_channels.numpy()
 
         if not t_alpha == type(None):
             self.container.image = np.concatenate(
@@ -403,14 +446,19 @@ class ImageProcessor(IImageProcessor):
         Converts uint8/uint16/float32 to float16/float32 types to be process by the generator.
         """
         if input:
-            self.container.step.update_step("converting the data type (color depth) before upscaling.")
-            self._convert_datatype_in(
-                self.container.color_channels,
-                self.container.alpha,
-                self.config,
+            self.container.step.update_step(
+                "converting the data type (color depth) before upscaling."
+            )
+            self.container.color_channels, self.container.alpha = (
+                self._convert_datatype_in(
+                    self.container.color_channels,
+                    self.container.alpha,
+                )
             )
         else:
-            self.container.step.update_step("converting the data type (color depth) after upscaling.")
+            self.container.step.update_step(
+                "converting the data type (color depth) after upscaling."
+            )
             self._convert_datatype_out(self.container.image, self.config)
 
     def _convert_datatype_in(self, color_channels, alpha_channels) -> None:
@@ -423,7 +471,7 @@ class ImageProcessor(IImageProcessor):
         if (
             self.config.upscale_color_with_generator
         ):  # if color channels weren't upscaled using the linear algorithm
-            convert_input_image_dtype(
+            color_channels = convert_input_image_dtype(
                 self.config.color_space,
                 self.config.upscale_precision[0],
                 color_channels,
@@ -431,11 +479,12 @@ class ImageProcessor(IImageProcessor):
         if (
             self.config.upscale_alpha_with_generator
         ):  # if the alpha channel wasn't upscaled using the linear algorithm
-            convert_input_image_dtype(
+            alpha_channels = convert_input_image_dtype(
                 self.config.color_space,
                 self.config.upscale_precision[0],
                 alpha_channels,
             )
+        return color_channels, alpha_channels
 
     def _convert_datatype_out(self, full_image, config) -> None:
         self.container.image = convert_output_image_dtype(config, channels=full_image)
@@ -444,14 +493,16 @@ class ImageProcessor(IImageProcessor):
         self.container.step.update_step("attempting to process export color mode.")
 
         self.container.image = process_output_color_mode(
-            self.container.color_channels, self.config.export_mode
+            self.container.image, self.config.export_mode
         )
 
     def _apply_dds_mipmap_fix(self):
         """
         Wand (Image Magick's Python binding) does not handle mipmaps correctly when the alpha channel is all zeros.
         """
-        self.container.step.update_step("applying the dds mip level workaround for the .dds image export format.")
+        self.container.step.update_step(
+            "applying the dds mip level workaround for the .dds image export format."
+        )
 
         if self.config.mipmaps != "none":
             image = self.container.image
@@ -481,10 +532,13 @@ class ImageProcessor(IImageProcessor):
             and self.container.master_frame
         ):
             self.container.step.update_step("attempting to process noisy image.")
-            
-            
-            self.container.master_frame.print_export_logs(f"Processing noise for: {self.container.config.src_image_name}")
-            self.container.step.update_step("attempting to process color mode noisy image.")
+
+            self.container.master_frame.print_export_logs(
+                f"Processing noise for: {self.container.config.src_image_name}"
+            )
+            self.container.step.update_step(
+                "attempting to process color mode noisy image."
+            )
             self.container.noisy_copy = process_output_color_mode(
                 self.container.noisy_copy, self.config.export_mode
             )
@@ -493,7 +547,7 @@ class ImageProcessor(IImageProcessor):
                 image=cv2.resize(
                     src=self.container.noisy_copy,
                     dsize=tuple(
-                        int(dim * self.upscale_factor)
+                        int(dim * self.config.upscale_factor)
                         for dim in self.container.noisy_copy.shape[:-1][::-1]
                     ),
                     interpolation=cv2.INTER_LANCZOS4,
@@ -506,7 +560,9 @@ class ImageProcessor(IImageProcessor):
                 self.container.noisy_copy = np.expand_dims(
                     self.container.noisy_copy, axis=2
                 )
-            self.container.step.update_step("attempting to process color depth for noisy image.")
+            self.container.step.update_step(
+                "attempting to process color depth for noisy image."
+            )
             self.container.noisy_copy = convert_output_image_dtype(
                 self.config,
                 self.container.noisy_copy,
@@ -514,20 +570,25 @@ class ImageProcessor(IImageProcessor):
                 self.container.image.dtype,
             )
             # A more sophisticated algorithm can be used to retain only the lightest/darkest patterns in the original texture and add them back as noise to the AI-upscaled texture
-            self.container.step.update_step("attempting to combine noisy and upscaled image.")
+            self.container.step.update_step(
+                "attempting to combine noisy and upscaled image."
+            )
             mask = self.container.noisy_copy < self.container.image * (
                 self.config.noise_factor
             )
             np.copyto(self.container.image, self.container.noisy_copy, where=mask)
             self.container.noisy_copy = None
 
-    def _handle_channel_order(self, channels: np.ndarray) -> np.ndarray:
+    def _handle_channel_order(self, channels: Optional[np.ndarray] = None) -> np.ndarray:
         """
         Expands grayscale images to (W, H, 1) and reverses color channels for opencv format compatibility if necessary.
         """
         # Ensure grayscale images are expanded to (W, H, 1)
-        self.container.step.update_step("attempting reverse color channels for image writing.")
-
+        self.container.step.update_step(
+            "attempting reverse color channels for image writing."
+        )
+        if not isinstance(channels, np.ndarray):
+            channels = self.container.image
         if len(channels.shape) == 2:
             channels = np.expand_dims(channels, axis=2)
 
@@ -544,8 +605,10 @@ class ImageProcessor(IImageProcessor):
                 channels[..., :3] = channels[..., 2::-1]  # Swap BGR <-> RGB
         return channels
 
-    def _handle_downscaling(self, scale_alpha, scale_color, strategy: str = "lanczos4") -> np.ndarray:
-        if self.config.scale < 1:
+    def _handle_downscaling(
+        self, scale_alpha, scale_color, strategy: str = "lanczos4"
+    ) -> np.ndarray:
+        if self.config.upscale_factor < 1:
             if scale_alpha:
                 downscale_image(self.container.alpha, strategy)
             if scale_color:

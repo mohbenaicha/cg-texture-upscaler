@@ -268,10 +268,11 @@ def stitch_together(
 
 
 def setup_generator(
-    export_config: ImageConfig, generator: Generator
-) -> Tuple[Optional[Generator], Union[int, float]]:
+    export_config: 'ImageConfig', generator: 'Generator'
+) -> Tuple[Optional['Generator'], Union[int, float]]:
     
-    scale = ConfigReference.scale_map[export_config.scale]
+    scale = export_config.upscale_factor
+
     if scale != 1:
         if scale != 0.5:
             try:
@@ -312,7 +313,7 @@ def setup_generator(
     return generator, scale
 
 
-def load_model(device: str, scale: Union[int, float], load: bool = True) -> Generator:
+def load_model(device: str, scale: Union[int, float], load: bool = True) -> 'Generator':
     """
     Loads the Generator model architecture and respective inference weights.
     """

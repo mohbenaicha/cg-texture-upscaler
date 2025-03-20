@@ -2,14 +2,12 @@ import numpy as np
 import cv2, os, math
 from PIL import Image
 from utils.image_utilities.interfaces import IImageIO
-from utils.logger import write_log_to_file
+from utils.logger import write_log_to_file, log_to_interface
 from app_config.config import *
-from wand import image as wand_image
+from wand.image import Image as wand_image
 from utils.image_utilities.utils import determine_if_alpha_is_0
-from utils.export_utils import log_to_interface
 
 from typing import TYPE_CHECKING
-
 if TYPE_CHECKING:
     from utils.image_utilities.orchestrator import ImageContainer
 
@@ -17,10 +15,11 @@ if TYPE_CHECKING:
 class ImageIO(IImageIO):
     """Handles reading and writing images."""
 
-    def __init__(self, container: ImageContainer):
+    def __init__(self, container: 'ImageContainer'):
         self.container = container
 
     def read_image(self, src_path: str, img_name: str) -> None:
+        self.container.step.update_step("attempting to read image.")
         src_path = os.path.join(src_path, img_name)
         if self.container.config.src_format in ConfigReference.opencv_formats:
             self.container.image = cv2.imread(src_path, cv2.IMREAD_UNCHANGED)
@@ -30,7 +29,7 @@ class ImageIO(IImageIO):
 
         # extract datatype for future use
         self.container.config.src_dtype = str(self.container.image.dtype)
-        self.container.config.mode = self._get_mode_from_array(self.container)
+        self.container.config.mode = self._get_mode_from_array()
         self.container.config.length = len(self.container.config.mode)
 
     def write_image(self) -> None:
@@ -40,7 +39,6 @@ class ImageIO(IImageIO):
         log_to_interface(self.container.master_frame, f"\n[INFO] Saving {im_name}", ExportConfig.cli_verbosity)
         
         im_name = self._handle_naming(
-            self.container.config.export_naming,
             im_name,
             self.container.config.img_index,
         )
@@ -50,7 +48,7 @@ class ImageIO(IImageIO):
         else:
             save_path = os.path.join(self.container.config.single_export_location, im_name)
 
-        if self.self.container.config.export_format in ConfigReference.opencv_formats:
+        if self.container.config.export_format in ConfigReference.opencv_formats:
             self._write_opencv_image(save_path)
         else:
             self._write_wand_image(save_path, im_name)
@@ -111,7 +109,7 @@ class ImageIO(IImageIO):
         """
         Determines image channel mode from the length of a np.array object using a naive yet practical approach.
         """
-        shape = self.image.shape
+        shape = self.container.image.shape
         if len(shape) == 2:
             return "L"
         else:

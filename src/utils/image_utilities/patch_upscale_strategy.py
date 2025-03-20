@@ -37,7 +37,7 @@ class UpscalingStrategy(ABC):
             The upscaled image as a tensor.
     """
     @abstractmethod
-    def upscale(self, full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict) -> torch.Tensor:
+    def upscale(self, full_image: np.ndarray, channel_type: str, generator: 'Generator', export_config: dict) -> torch.Tensor:
         pass
 
 class RegularUpscalingStrategy(UpscalingStrategy):
@@ -49,7 +49,7 @@ class RegularUpscalingStrategy(UpscalingStrategy):
     upscale(full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict) -> torch.Tensor
         Returns the input image without any modifications.
     """
-    def upscale(self, full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict) -> torch.Tensor:
+    def upscale(self, full_image: np.ndarray, channel_type: str, generator: 'Generator', export_config: dict) -> torch.Tensor:
         return full_image.color_channels if channel_type == "color" else full_image.alpha
 
 class PatchUpscalingStrategy(UpscalingStrategy):
@@ -96,7 +96,6 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         Returns an array of shape (num of patches, c, h,w)
         """
 
-        global split
         split = False  # flag used for code organization
         if channel_type == "color":
             size: Tuple[int] = img.color_channels.shape
@@ -143,7 +142,7 @@ class PatchUpscalingStrategy(UpscalingStrategy):
             self, 
             img: Image.Image, 
             channel_type: str, 
-            generator: Generator,
+            generator: 'Generator',
             export_config: dict, 
             scale: float) -> torch.Tensor:
         
@@ -159,10 +158,10 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                     new_patches = generator(
                         confref.inference_transform(image=patch)["image"]
                         .unsqueeze(0)
-                        .to(export_config["device"])
+                        .to(export_config.device)
                         .to(
-                            dtype=confref.upscale_precision_levels[export_config["device"]][
-                                export_config["upscale_precision"]
+                            dtype=confref.upscale_precision_levels[export_config.device][
+                                export_config.upscale_precision
                             ][1]
                         )
                     ).cpu()
