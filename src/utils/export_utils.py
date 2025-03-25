@@ -3,7 +3,8 @@ from typing import TYPE_CHECKING
 import gc
 from PIL import ImageFile
 from wand.image import Image
-from utils.image_utilities.patch_upscale_strategy import *
+# from utils.image_utilities.patch_upscale_strategy import *
+from utils.patch_upscale_strategy import *
 from utils import *
 from utils.logger import write_log_to_file, log_to_interface
 from utils.image_container import ImageContainer
@@ -277,17 +278,12 @@ def scale_image(
             )
         ),
     )
+    patch_upscale_strategy = (
+        PatchUpscalingStrategy()
+        if ExportConfig.split_large_image
+        else RegularUpscalingStrategy()
+    )
 
-    patch_upscale_strategy = (
-        PatchUpscalingStrategy()
-        if ExportConfig.split_large_image
-        else RegularUpscalingStrategy()
-    )
-    patch_upscale_strategy = (
-        PatchUpscalingStrategy()
-        if ExportConfig.split_large_image
-        else RegularUpscalingStrategy()
-    )
 
     if generator:
         try:
@@ -503,7 +499,17 @@ def _export_images(
                     img_name=im_name,
                     **export_config,
                 )
-                container.read
+
+                step.update_step("attempting to scale linearly.")
+                container.check_all_values_equivalent()
+                step.update_step("attempting to split color and alpha channels for separate processing.")
+                container.split_image()
+                step.update_step("attempting to correct gamma.")
+                container.handle_gamma_correction(export_config["gamma_adjustment"])
+                step.update_step("converting the data type before upscaling.")
+                container.convert_datatype(input=True)
+                step.update_step("attempting to upscale the image with the chosen model")
+
 
                 scale_image(
                     master=master,
@@ -562,7 +568,7 @@ def _export_images(
                     )
                     if task.stopped():
                         break
-                split, container, warn_mssg, confref.split_color, confref.split_alpha = (
+                _, container, warn_mssg, confref.split_color, confref.split_alpha = (
                     False,
                     None,
                     False,
@@ -702,74 +708,74 @@ def export_images(
             )
 
         for i in export_indices:
-            try:
-                count += 1
-                im_name, im_path = cache_copy[0][i], cache_copy[1][i]
-                fp = os.path.join(im_path, im_name)
-                step.update_step(f"reading image: {im_name}")
+            # try:
+            count += 1
+            im_name, im_path = cache_copy[0][i], cache_copy[1][i]
+            fp = os.path.join(im_path, im_name)
+            step.update_step(f"reading image: {im_name}")
 
-                sub_time_start = time.time()
+            sub_time_start = time.time()
 
-                log_to_interface(master, f"Processed/Total: {count-1}/{total_images}", verbose, True)
-                
-                log_to_interface(master, f"\nAttempting to process file:\n\t {fp}\n", verbose)
+            log_to_interface(master, f"Processed/Total: {count-1}/{total_images}", verbose, True)
+            
+            log_to_interface(master, f"\nAttempting to process file:\n\t {fp}\n", verbose)
 
 
-                # Setup image processing orchestrator
-                container = Container(
-                    img_index=i,
-                    src_path=im_path,
-                    trg_path=(
-                        export_config["single_export_location"]
-                        if not export_config["export_to_original"]
-                        else im_path
-                    ),
-                    img_name=im_name,
-                    processing_step=step,
-                    **export_config,
-                )
-                # read image
-                container.read_image()
-                
-                # preprocess image (color mode, space, depth, gamma, channel order, noise)
-                container.preprocess_image()
-                
-                # process image (upscale/downscale)
-                container.process_image()
+            # Setup image processing orchestrator
+            container = Container(
+                img_index=i,
+                src_path=im_path,
+                trg_path=(
+                    export_config["single_export_location"]
+                    if not export_config["export_to_original"]
+                    else im_path
+                ),
+                img_name=im_name,
+                processing_step=step,
+                **export_config,
+            )
+            # read image
+            container.read_image()
+            
+            # preprocess image (color mode, space, depth, gamma, channel order, noise)
+            container.preprocess_image()
+            
+            # process image (upscale/downscale)
+            container.process_image()
 
-                # postprocess image (color mode, space, depth, gamma, channel order, noise)
-                container.postprocess_image()
+            # postprocess image (color mode, space, depth, gamma, channel order, noise)
+            container.postprocess_image()
+            
 
-                # write image (naming, format, compression, etc)
-                container.write_image()
-                
+            # write image (naming, format, compression, etc)
+            container.write_image()
+            
 
-                if master:
-                    progress += step_size
-                    prog_bar.set(value=progress)
-                    write_log_to_file(
-                        "INFO",
-                        f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
-                    )
-                    if task.stopped():
-                        break
-                container, warn_mssg, confref.split_color, confref.split_alpha = (
-                    False,
-                    None,
-                    False,
-                    False,
-                    False,
-                )
-
-            except Exception as e:
-                
-                not_processed.append((im_name, im_path))
+            if master:
+                progress += step_size
+                prog_bar.set(value=progress)
                 write_log_to_file(
-                    "ERROR",
-                    f"Ran into an issue while {step}: {im_name} \n\t {e}",
+                    "INFO",
+                    f"Processing time for image {im_name}: {round(time.time()-sub_time_start, 2)} seconds.",
                 )
-                warning_mssg = True if master else False
-                continue
+                if task.stopped():
+                    break
+            container, warn_mssg, confref.split_color, confref.split_alpha = (
+                None,
+                False,
+                False,
+                False,
+            )
+
+            # except Exception as e:
+                
+            #     not_processed.append((im_name, im_path))
+            #     write_log_to_file(
+            #         "ERROR",
+            #         f"Ran into an issue while {step}: {im_name} \n\t {e}",
+            #     )
+            #     warning_mssg = True if master else False
+            #     continue
         tot_time = round(time.time() - start_time, 2)
         write_log_to_file(
             "INFO",

@@ -543,6 +543,7 @@ class ImageContainer:
         self, save_path, im_name: str
     ) -> None:
         self.determine_if_alpha_is_0()
+        cv2.waitKey(0)
         with wand_image.from_array(self.image) as img:
             img.format = self.export_format
 
@@ -575,9 +576,12 @@ class ImageContainer:
                     img.type = "truecolor"
                 elif self.export_mode == "RGBA":
                     img.type = "truecoloralpha"
-
             if self.mipmaps:
                 self.handle_mipmaps(self.mipmaps, img)
+            
+            print("image.type", img.type)
+            print("image.compression", img.compression)
+            print("image.format", img.format)
 
             img.save(filename=save_path)
 
@@ -632,6 +636,7 @@ class ImageContainer:
                     if not "A" in self.export_mode
                     else channels[..., :]
                 )
+                
             else:  # write in RGB
                 temp = np.repeat(channels[:, :, 0], 3)
                 channels = (

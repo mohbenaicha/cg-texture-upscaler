@@ -77,7 +77,7 @@ class ImageIO(IImageIO):
                     if not self.container.config.compression == "none"
                     else "no"
                 )
-            # bmp specific information TODO: add warning about color mode being changed
+            # bmp specific information
             if (
                 self.container.config.export_format == "bmp"
                 and self.container.config.compression == "rle"
@@ -99,11 +99,11 @@ class ImageIO(IImageIO):
                     img.type = "truecolor"
                 elif self.container.config.export_mode == "RGBA":
                     img.type = "truecoloralpha"
-
             if self.container.config.mipmaps:
                 self._handle_mipmaps(self.container.config.mipmaps, img)
-
+            
             img.save(filename=save_path)
+
 
     def _get_mode_from_array(self) -> None:
         """
@@ -126,7 +126,7 @@ class ImageIO(IImageIO):
         """
         Writes an image using OpenCV's imwrite function.
         """
-        cv2.imwrite(filename=save_path, img=self.image, params=self.opencv_write_flgs)
+        cv2.imwrite(filename=save_path, img=self.container.image, params=self.container.config.opencv_write_flgs)
 
     def _handle_mipmaps(self, mipmaps: str, img):
         """
@@ -149,7 +149,8 @@ class ImageIO(IImageIO):
         else:
             user_choice = float(user_choice[:-1]) / 100
         limiting_dim = math.log2(min(image.size))
-        return str(round(user_choice * limiting_dim, 0))
+        num_mipmaps = str(round(user_choice * limiting_dim, 0))
+        return num_mipmaps
 
     def _handle_naming(self, im_name, index):
         config = self.container.config

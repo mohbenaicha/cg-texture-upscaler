@@ -32,42 +32,13 @@ class ImageProcessor(IImageProcessor):
         self.gamma_adjustment = gamma_adjustment
 
     def preprocess_image(self):
-        print("Image dtype before preprocess", self.container.image.dtype)
-        print("Image type: ", type(self.container.image))
         self._handle_dimensions()
-        print("image.dtype before check all values", self.container.image.dtype)
-        print("Image type: ", type(self.container.image))
-
         self._check_all_values_equivalent()
-        print("Dtype after check all values", self.container.image.dtype)
-        print("Image type: ", type(self.container.image))
-
+        # self._handle_channel_order()
         self._preprocess_noisy_image()
-        print("Image type: ", type(self.container.image))
-
         self._split_image()
-        print("Dtype after split image")
-        try:
-            print(self.container.color_channels.dtype)
-            print(self.container.alpha.dtype)
-
-        except:
-            pass
-        self._handle_channel_order(self.container.color_channels)
-        print("Dtype after handle channel order")
-        try:
-            print(self.container.color_channels.dtype)
-            print(self.container.alpha.dtype)
-        except:
-            pass
         self._handle_gamma(self.gamma_adjustment)  # handle_gamma_correction
-        print("Dtype after handle gamma")
-        print(self.container.color_channels.dtype)
-        print(self.container.alpha.dtype)
         self._convert_dtype(input=True)
-        print("Dtype after convert dtype")
-        print(self.container.color_channels.dtype)
-        print(self.container.alpha.dtype)
 
     def postprocess_image(self):
         self._handle_gamma(1 / self.gamma_adjustment)
@@ -84,7 +55,7 @@ class ImageProcessor(IImageProcessor):
                 "attempting to upscale the image with the chosen model"
             )
             self._upscale_image()
-        else:
+        elif self.config.upscale_factor < 1:
             self.container.step.update_step(
                 "attempting to downscale image using chosen method"
             )
@@ -105,9 +76,7 @@ class ImageProcessor(IImageProcessor):
         # downscales image
         if method in ["lanczos4", "linear", "cubic", "area", "nearest"]:
             self._handle_downscaling(
-                scale_alpha=self.config.upscale_alpha_with_generator,
-                scale_color=self.config.upscale_color_with_generator,
-                strategy=method,
+                strategy=method
             )
 
     def _resrgan_upscale(self):
@@ -158,7 +127,7 @@ class ImageProcessor(IImageProcessor):
                 "WARNING",
                 f"Using linear scaling to scale image {self.config.src_image_name}'s channels.",
             )
-            determine_if_alpha_is_0()
+            determine_if_alpha_is_0(self.container)
             self.container.image = upscale_linear(
                 self.container.image,
                 self.config.upscale_factor,
@@ -167,6 +136,7 @@ class ImageProcessor(IImageProcessor):
             )
             self.container.config.linear_upscale_all_channels = True
             self.container.config.proceed_with_split = False
+            
         else:
             self.container.config.linear_upscale_all_channels = False
             if (
@@ -229,6 +199,7 @@ class ImageProcessor(IImageProcessor):
             "attempting to split color and alpha channels for separate processing."
         )
 
+        self.alpha_scale_linear, self.color_scale_linear = False, False
         (
             self.container.config.upscale_color_with_generator,
             self.container.config.upscale_alpha_with_generator,
@@ -236,7 +207,7 @@ class ImageProcessor(IImageProcessor):
             (
                 True
                 if (
-                    self.config.upscale_factor in [2, 4, 0.5]
+                    self.config.upscale_factor in [2, 4]
                     and self.config.proceed_with_split
                 )
                 else False
@@ -255,7 +226,7 @@ class ImageProcessor(IImageProcessor):
                 if (
                     type(self.container.alpha) == np.ndarray
                     and "A" in self.config.export_mode
-                    and self.config.upscale_factor in [2, 4, 0.5]
+                    and self.config.upscale_factor in [2, 4]
                 )
                 else False
             )
@@ -278,6 +249,7 @@ class ImageProcessor(IImageProcessor):
                         self.config.upscale_precision,
                     )
                     self.container.config.upscale_alpha_with_generator = False
+                    self.alpha_scale_linear = True
 
                 else:  # prepare alpha channel to be fed to the Generator
                     self.container.alpha = (
@@ -318,6 +290,7 @@ class ImageProcessor(IImageProcessor):
                     self.config.upscale_precision,
                 )
                 self.container.config.upscale_color_with_generator = False
+                self.color_scale_linear = True
             else:
                 # the the color channels are to be fed to the generator, ensure the grayscale image
                 # is expanded into 3 channels
@@ -349,8 +322,9 @@ class ImageProcessor(IImageProcessor):
         )
         t_alpha, t_color = type(self.container.alpha), type(
             self.container.color_channels
-        )
-        if not self.config.upscale_factor == 0.5:
+        ) # np.ndarray or torch.Tensor or type(None)
+
+        if not self.config.upscale_factor == 0.5: # downscaling does split channels
             if not t_alpha == type(None):
                 if len(self.container.alpha.shape) == 2:
                     self.container.alpha = (
@@ -358,6 +332,7 @@ class ImageProcessor(IImageProcessor):
                         if t_alpha == np.ndarray
                         else self.container.alpha.unsqueeze(dim=2)
                     )
+
             if len(self.container.color_channels.shape) == 2:
                 self.container.color_channels = (
                     np.expand_dims(self.container.color_channels, axis=2)
@@ -379,36 +354,46 @@ class ImageProcessor(IImageProcessor):
                     + self.container.alpha[1] * (0.5870)
                     + self.container.alpha[2] * (0.1140)
                 ).unsqueeze(0)
+
                 if ConfigReference.split_alpha and t_alpha == torch.Tensor:
                     self.container.alpha.permute(2, 0, 1)
+
             else:
                 if t_alpha == np.ndarray:
+
                     temp, self.container.alpha = (
                         np.transpose(self.container.alpha, axes=(2, 0, 1)),
                         None,
                     )
+
                     self.container.alpha, temp = temp, None
 
             if self.config.upscale_color_with_generator:
+
                 if ConfigReference.split_color and t_color == torch.Tensor:
                     self.container.color_channels = (
                         self.container.color_channels.permute(2, 0, 1)
                     )
             else:
+
                 if t_color == np.ndarray:
                     temp, self.container.color_channels = (
                         np.transpose(self.container.color_channels, axes=(2, 0, 1)),
                         None,
                     )
                     self.container.color_channels, temp = temp, None
+
             if t_alpha == torch.Tensor:
+
                 self.container.alpha = (
                     self.container.alpha.detach().cpu()
                     if self.config.device == "cuda"
                     else self.container.alpha.to(dtype=torch.float32)
                 )
                 self.container.alpha = self.container.alpha.numpy()
+
             if t_color == torch.Tensor:
+
                 self.container.color_channels = (
                     self.container.color_channels.detach().cpu()
                     if self.config.device == "cuda"
@@ -417,6 +402,8 @@ class ImageProcessor(IImageProcessor):
                 self.container.color_channels = self.container.color_channels.numpy()
 
         if not t_alpha == type(None):
+            print("self.container.alpha.shape: ", self.container.alpha.shape)
+            print("self.container.color_channels.shape: ", self.container.color_channels.shape)
             self.container.image = np.concatenate(
                 (self.container.color_channels, self.container.alpha),
                 axis=(0 if self.config.upscale_factor != 0.5 else 2),
@@ -525,12 +512,14 @@ class ImageProcessor(IImageProcessor):
 
     def _handle_noise(self) -> None:
 
+
         if (
             self.config.noise_factor != 0.0
             and not self.config.linear_upscale_all_channels
             and self.config.upscale_factor != 0.5
             and self.container.master_frame
         ):
+            print("shhhckhkhkh::::Found noise > 0", self.config.noise_factor)
             self.container.step.update_step("attempting to process noisy image.")
 
             self.container.master_frame.print_export_logs(
@@ -579,7 +568,7 @@ class ImageProcessor(IImageProcessor):
             np.copyto(self.container.image, self.container.noisy_copy, where=mask)
             self.container.noisy_copy = None
 
-    def _handle_channel_order(self, channels: Optional[np.ndarray] = None) -> np.ndarray:
+    def _handle_channel_order(self) -> None:
         """
         Expands grayscale images to (W, H, 1) and reverses color channels for opencv format compatibility if necessary.
         """
@@ -587,10 +576,10 @@ class ImageProcessor(IImageProcessor):
         self.container.step.update_step(
             "attempting reverse color channels for image writing."
         )
-        if not isinstance(channels, np.ndarray):
-            channels = self.container.image
-        if len(channels.shape) == 2:
-            channels = np.expand_dims(channels, axis=2)
+        # if not isinstance(channels, np.ndarray):
+        #     channels = self.container.image
+        if len(self.container.image) == 2:
+            self.container.image = np.expand_dims(self.container.image, axis=2)
 
         # Reverse color channels if necessary
         if self.config.length > 2:
@@ -602,14 +591,14 @@ class ImageProcessor(IImageProcessor):
             )
 
             if src_frmt_is_opencv != dest_frmt_is_opencv:  # Only swap if formats differ
-                channels[..., :3] = channels[..., 2::-1]  # Swap BGR <-> RGB
-        return channels
+                self.container.image[..., :3] = self.container.image[..., 2::-1]  # Swap BGR <-> RGB
 
     def _handle_downscaling(
-        self, scale_alpha, scale_color, strategy: str = "lanczos4"
+        self, strategy: str = "lanczos4"
     ) -> np.ndarray:
-        if self.config.upscale_factor < 1:
-            if scale_alpha:
-                downscale_image(self.container.alpha, strategy)
-            if scale_color:
-                downscale_image(self.container.color_channels, strategy)
+        print("downscaling image")
+        if not self.container.config.linear_upscale_all_channels:
+            if not self.alpha_scale_linear:
+                self.container.alpha = downscale_image(self.container.alpha, strategy, self.config.upscale_factor)
+            if not self.color_scale_linear:
+                self.container.color_channels = downscale_image(self.container.color_channels, strategy, self.config.upscale_factor)

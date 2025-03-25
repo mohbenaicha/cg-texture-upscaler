@@ -321,6 +321,7 @@ class ExportFrame(ctk.CTkFrame):
                     args=(
                         self,
                         export_config,
+                        # None, # generator model for legacy support
                         exp_ids,
                         self.progbar,
                         self.stop_export_button,

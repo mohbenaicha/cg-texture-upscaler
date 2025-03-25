@@ -8,7 +8,7 @@ if TYPE_CHECKING:
 from app_config.config import ConfigReference
 
 
-def determine_if_alpha_is_0(image_conatiner: 'ImageContainer') -> None:
+def determine_if_alpha_is_0(image_conatiner: "ImageContainer") -> None:
     # TODO: automatic not working consistently
     if ("A" in image_conatiner.config.mode) and (
         image_conatiner.config.compression == "automatic"
@@ -156,7 +156,7 @@ def convert_RGB_to_grayscale(channels: np.ndarray) -> np.ndarray:
 
 def add_alpha(trg_image_dtype: str, channels: np.ndarray, opacity: float):
     """
-    returns a np.array of shape (channels.shape[0] + 1, height, width) 
+    returns a np.array of shape (channels.shape[0] + 1, height, width)
     i.e. with the alpha channel appended to the input channels using the same dtype
     """
     alpha = np.ones(channels.shape[:2], dtype=channels.dtype)
@@ -172,7 +172,9 @@ def add_alpha(trg_image_dtype: str, channels: np.ndarray, opacity: float):
     ).astype(channels.dtype)
 
 
-def process_output_color_mode(channels: np.ndarray, export_color_mode: str) -> np.ndarray:
+def process_output_color_mode(
+    channels: np.ndarray, export_color_mode: str
+) -> np.ndarray:
     """
     channels: np.array of shaep (channels, height, width)
     export_color_mode: str of the form "RGB", "RGBA", "L", "LA"
@@ -187,7 +189,11 @@ def process_output_color_mode(channels: np.ndarray, export_color_mode: str) -> n
             channels = channels[..., :1]
         else:  # write in RGB
             temp = np.repeat(channels[:, :, 0:1], 3, axis=2)
-            channels = temp if "A" not in export_color_mode else np.concatenate((temp, channels[:, :, 1:2]), axis=2)
+            channels = (
+                temp
+                if "A" not in export_color_mode
+                else np.concatenate((temp, channels[:, :, 1:2]), axis=2)
+            )
     elif no_channels == 3:  # RGB
         if "L" in export_color_mode:  # write in greyscale
             channels = convert_RGB_to_grayscale(channels)
@@ -243,7 +249,10 @@ def unsharp_mask(
         )  # restore the original pixel values where the threshold holds
     return sharpened
 
-def downscale_image(image: np.ndarray, strategy: str = "lanczos4") -> None:
+
+def downscale_image(
+    image: np.ndarray, strategy: str = "lanczos4", scale_factor: float = 0.5
+) -> np.ndarray:
     strategy_map = {
         "nearest": cv2.INTER_NEAREST,
         "linear": cv2.INTER_LINEAR,
@@ -254,11 +263,12 @@ def downscale_image(image: np.ndarray, strategy: str = "lanczos4") -> None:
     orig_dtype = image.dtype
     image = cv2.resize(
         src=image.astype("float32" if orig_dtype == "float16" else orig_dtype),
-        dsize=tuple(int(dim / 2) for dim in image.shape[:2][::-1]),
+        dsize=tuple(int(dim * scale_factor) for dim in image.shape[:2][::-1]),
         interpolation=strategy_map[strategy],
     )
     if len(image.shape) == 2:
         image = np.expand_dims(image, 2)
+    return image
 
 
 def upscale_linear(
@@ -270,15 +280,15 @@ def upscale_linear(
     """
     If all values across image channels are the same, fill a new array with that value.
     """
-    w, h, c = (
-        (channels.shape) if len(channels.shape) == 3 else (*channels.shape, None)
-    )
+    w, h, c = (channels.shape) if len(channels.shape) == 3 else (*channels.shape, None)
 
     return (
         np.ones(
-            shape=(int(w * factor), int(h * factor))
-            if not c
-            else (int(w * factor), int(h * factor), c),
+            shape=(
+                (int(w * factor), int(h * factor))
+                if not c
+                else (int(w * factor), int(h * factor), c)
+            ),
             dtype=channels.dtype,
         )
         * fill_value

@@ -54,10 +54,10 @@ def write_log_to_file(log_type: str, message: str):
         logger.log(log_type, message)
 
 
-def log_to_interface(gui: Union['ExportFrame', None] = None, msg: str = "", verbose: bool = False, print_img_index: bool = False):
+def log_to_interface(gui: Union['ExportFrame', None] = None, msg: str = "", cli_verbosity: bool = False, print_img_index: bool = False):
     if gui:
         gui.print_export_logs(msg)
         if print_img_index:
             gui.print_image_index(msg)
-    elif verbose:
+    if cli_verbosity:
         print(msg)
