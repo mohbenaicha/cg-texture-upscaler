@@ -53,9 +53,11 @@ class ImageUpscaler(IImageUpscaler):
         )
 
         patch_upscale_strategy = (
-            PatchUpscalingStrategy()
+            PatchUpscalingStrategy(self.container, self.image_config.upscale_factor)
             if ExportConfig.split_large_image
-            else RegularUpscalingStrategy()
+            else RegularUpscalingStrategy(
+                self.container, self.image_config.upscale_factor
+            )
         )
 
         if self.generator:
@@ -81,28 +83,43 @@ class ImageUpscaler(IImageUpscaler):
                             dtype=self.image_config.upscale_precision[1],
                         ):
                             # upscaling color
+                            print(
+                                "ExportConfig.split_large_image: ",
+                                ExportConfig.split_large_image,
+                            )
+                            print(
+                                "self.image_config.upscale_color_with_generator: ",
+                                self.image_config.upscale_color_with_generator,
+                            )
+                            print(
+                                "self.image_config.upscale_alpha_with_generator: ",
+                                self.image_config.upscale_alpha_with_generator,
+                            )
                             if self.image_config.upscale_color_with_generator:
-                                if (
-                                    ExportConfig.split_large_image
-                                    or ConfigReference.split_color
-                                ):
-                                    print("Patch upscaling...")
+                                print(
+                                    ".....................determine_color_image_split....................."
+                                )
+                                print("1")
+                                print(
+                                    "ConfigReference.split_color: ",
+                                    ConfigReference.split_color,
+                                )
+                                print("2")
+                                if ConfigReference.split_color:
+                                    print("3")
+                                    print("Patch color upscaling...")
                                     self.container.color_channels = (
                                         patch_upscale_strategy.upscale(
-                                            self.container,
+                                            self.container.color_channels,
                                             "color",
                                             self.generator,
                                             self.image_config,
-                                            self.image_config.upscale_factor,
                                         )
                                     )
-
-                                    print(
-                                        "color channels depth (patch): ",
-                                        self.container.color_channels.dtype,
-                                    )
+                                    print("4")
                                 else:
-                                    print("Full image upscaling...")
+                                    print("5")
+                                    print("Full color upscaling...")
                                     self.container.color_channels = self.generator(
                                         ConfigReference.inference_transform(
                                             image=self.container.color_channels
@@ -110,34 +127,29 @@ class ImageUpscaler(IImageUpscaler):
                                         .unsqueeze(0)
                                         .to("cuda")
                                     )[0]
-                                    print(
-                                        "color channels depth (non-patch): ",
-                                        self.container.color_channels.dtype,
-                                    )
+                                    print("6")
 
                             # upscaling alpha
                             if self.image_config.upscale_alpha_with_generator:
-
-                                if (
-                                    ExportConfig.split_large_image
-                                    or ConfigReference.split_alpha
-                                ):
-                                    print("Patch upscaling alpha...")
+                                print(
+                                    ".....................determine_alpha_image_split....................."
+                                )
+                                print(
+                                    "ConfigReference.split_alpha: ",
+                                    ConfigReference.split_alpha,
+                                )
+                                if ConfigReference.split_alpha:
+                                    print("Patch alpha upscaling alpha...")
                                     self.container.alpha = (
                                         patch_upscale_strategy.upscale(
-                                            self.container,
+                                            self.container.alpha,
                                             "alpha",
                                             self.generator,
                                             self.image_config,
-                                            self.image_config.upscale_factor,
                                         )
                                     )
-                                    print(
-                                        "alpha channels depth: ",
-                                        self.container.alpha.dtype,
-                                    )
                                 else:
-                                    print("Full image upscaling alpha...")
+                                    print("Full alpha upscaling alpha...")
                                     self.container.alpha = self.generator(
                                         ConfigReference.inference_transform(
                                             image=self.container.alpha

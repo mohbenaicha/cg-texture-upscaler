@@ -41,8 +41,11 @@ class ImageProcessor(IImageProcessor):
         self._convert_dtype(input=True)
 
     def postprocess_image(self):
+        print("1) type of self.color: ", type(self.container.color_channels))
         self._handle_gamma(1 / self.gamma_adjustment)
+        print("2) type of self.color: ", type(self.container.color_channels))
         self._recombine_channels()
+
         self._convert_dtype(input=False)
         self._handle_export_channels()
         self._apply_dds_mipmap_fix
@@ -340,6 +343,11 @@ class ImageProcessor(IImageProcessor):
                     else self.container.color_channels.unsqueeze(dim=2)
                 )
 
+            print("self.container.alpha.shape: ", self.container.alpha.shape)
+            print("self.container.color_channels.shape: ", self.container.color_channels.shape)
+            print("self.contianer.alpha.type: ", type(self.container.alpha))
+            print("self.container.color_channels.type: ", type(self.container.color_channels))
+            print("------------------------------------")
             if self.config.upscale_alpha_with_generator:
                 if not type(self.container.alpha) == type(None):
                     alpha_dims = len(self.container.alpha.shape)

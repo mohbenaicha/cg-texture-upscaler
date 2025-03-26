@@ -321,8 +321,8 @@ class GUIConfig:
 
 
 class TechnicalConfig:
-    gui_version: str = "0.0.6"
-    cli_version: str = "0.0.5"
+    gui_version: str = "0.0.7"
+    cli_version: str = "0.0.6"
     app_display_name: str = "CG Texture Upscaler"
     app_cli_name: str = "CG Texture Upscaler CLI"
     app_author: str = "Mohamed Benaicha"

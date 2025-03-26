@@ -228,7 +228,7 @@ def stitch_together(
     target_shape: Tuple[int],
     padding_size: int = 4,
     no_channels: int = 3,
-) -> np.ndarray:
+) -> torch.Tensor:
     """Reconstruct the image from overlapping patches.
     After scaling, shapes and padding should be scaled too.
     Args:
