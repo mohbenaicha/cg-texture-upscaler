@@ -720,7 +720,6 @@ def export_images(
             
             log_to_interface(master, f"\nAttempting to process file:\n\t {fp}\n", verbose)
 
-
             # Setup image processing orchestrator
             container = Container(
                 img_index=i,
@@ -745,11 +744,9 @@ def export_images(
 
             # postprocess image (color mode, space, depth, gamma, channel order, noise)
             container.postprocess_image()
-            
 
             # write image (naming, format, compression, etc)
             container.write_image()
-            
 
             if master:
                 progress += step_size

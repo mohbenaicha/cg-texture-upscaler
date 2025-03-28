@@ -221,6 +221,17 @@ def split_image_into_overlapping_patches(
 
     return (np.array(patches), padded_image.shape)
 
+def handle_padding_size(size: int) -> int:
+    """
+    Determines the padding size for image splitting
+    based on the user's setting.
+    """
+    # take the lesser of the dimensions since the padding size is a % that,
+    # if dependent on the longer dimension, may exceed the length of the
+    # shorter dimension
+    pad_size = math.floor(0.03 * min(size[:2]) / 2)
+    pad_size = int(pad_size) if pad_size % 2 == 0 else int(pad_size + 1)
+    return pad_size
 
 def stitch_together(
     patches: torch.Tensor,

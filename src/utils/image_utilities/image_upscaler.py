@@ -53,10 +53,10 @@ class ImageUpscaler(IImageUpscaler):
         )
 
         patch_upscale_strategy = (
-            PatchUpscalingStrategy(self.container, self.image_config.upscale_factor)
+            PatchUpscalingStrategy(self.container, self.image_config)
             if ExportConfig.split_large_image
             else RegularUpscalingStrategy(
-                self.container, self.image_config.upscale_factor
+                self.container, self.image_config
             )
         )
 
@@ -113,7 +113,6 @@ class ImageUpscaler(IImageUpscaler):
                                             self.container.color_channels,
                                             "color",
                                             self.generator,
-                                            self.image_config,
                                         )
                                     )
                                     print("4")
@@ -145,7 +144,6 @@ class ImageUpscaler(IImageUpscaler):
                                             self.container.alpha,
                                             "alpha",
                                             self.generator,
-                                            self.image_config,
                                         )
                                     )
                                 else:

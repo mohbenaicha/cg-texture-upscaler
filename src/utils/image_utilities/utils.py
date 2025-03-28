@@ -293,3 +293,4 @@ def upscale_linear(
         )
         * fill_value
     ).astype(upscale_precision[0])
+

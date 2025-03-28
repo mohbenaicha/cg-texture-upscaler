@@ -111,17 +111,22 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         split = True if size[0]*size[1]*scale*scale > max_size_to_split else False
 
         if split:
+            print("----->>>Splitting image into patches")
             if channel_type == "color":
                 confref.split_color = True
             else:
                 confref.split_alpha = True
             if ExportConfig.split_large_image:
+                print("----->size: ", size)
                 pad_size: int = self.handle_padding_size(size)
+                print(f"----->Padding size: {pad_size}")
 
                 lr_image: np.ndarray = pad_reflect(
                     img.color_channels if channel_type == "color" else img.alpha, pad_size
                 )
                 min_ = min(lr_image.shape[:2])
+                print(f"----->Minimum size: {min_}")
+                
                 no_patches = 0
                 while True:  
                     no_patches += 1
@@ -130,11 +135,11 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                         patch_size = math.ceil(min_ / no_patches)
                         break
                 patch_size += (1 if not patch_size % 2 == 0 else 0)
+                print(f"----->Patch size: {patch_size}")
 
                 patches, p_shape = split_image_into_overlapping_patches(
                     lr_image, patch_size=patch_size, padding_size=pad_size
                 )
-               
                 return patches, p_shape, pad_size, size
         else:
             return (None,) * 4
@@ -150,6 +155,11 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         full_image, p_shape, pad_size, lr_im_shape = self.handle_image_split(channel_type, scale, img)
         new_patches = None
         i = 0
+        if isinstance(full_image, np.ndarray):
+            print(f"Patches shape: {full_image.shape}")
+            print(f"Patch shape: {p_shape}")
+            print(f"Padding size: {pad_size}")
+            print(f"Low-res image shape: {lr_im_shape}")
 
         if type(full_image) == np.ndarray:
 
@@ -188,7 +198,9 @@ class PatchUpscalingStrategy(UpscalingStrategy):
             scaled_image_shape: Tuple[int] = tuple(np.multiply(lr_im_shape[:2], scale)) + (
                 3,
             )
-
+            print("New patches shape: ", new_patches.shape)
+            print("Padded size scaled: ", padded_size_scaled)
+            print("Scaled image shape: ", scaled_image_shape)
             full_image: torch.Tensor = stitch_together(
                 patches=new_patches,
                 padded_image_shape=padded_size_scaled,

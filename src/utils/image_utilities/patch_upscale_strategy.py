@@ -9,6 +9,7 @@ from model.utils import (
     stitch_together,
     pad_reflect,
     split_image_into_overlapping_patches,
+    handle_padding_size
 )
 
 if TYPE_CHECKING:
@@ -32,9 +33,6 @@ class UpscalingStrategy(ABC):
             The type of channels to be used for upscaling.
         generator : Generator
             The generator instance to be used for upscaling.
-        export_config : dict
-            Configuration dictionary for exporting the upscaled image.
-
         Returns
         -------
         torch.Tensor
@@ -47,7 +45,6 @@ class UpscalingStrategy(ABC):
         full_image: np.ndarray,
         channel_type: str,
         generator: "Generator",
-        export_config: dict,
     ) -> torch.Tensor:
         pass
 
@@ -61,7 +58,8 @@ class RegularUpscalingStrategy(UpscalingStrategy):
     upscale(full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict) -> torch.Tensor
         Returns the input image without any modifications.
     """
-    def __init__(self, container, scale):
+
+    def __init__(self, container, export_config):
         ConfigReference.split_alpha = ConfigReference.split_color = False
 
     def upscale(
@@ -69,11 +67,8 @@ class RegularUpscalingStrategy(UpscalingStrategy):
         container: np.ndarray,
         channel_type: str,
         generator: "Generator",
-        export_config: dict,
     ) -> np.ndarray:
-        return (
-            container.color_channels if channel_type == "color" else container.alpha
-        )
+        return container.color_channels if channel_type == "color" else container.alpha
 
 
 class PatchUpscalingStrategy(UpscalingStrategy):
@@ -92,25 +87,26 @@ class PatchUpscalingStrategy(UpscalingStrategy):
             The type of channels in the image, e.g., "color" or "alpha".
         generator : Generator
             The generator instance used to upscale the image patches.
-        export_config : dict
-            Configuration dictionary containing export settings such as device and precision levels.
         Returns
         -------
         torch.Tensor
             The upscaled full image as a torch tensor.
     """
-    def __init__(self, container, scale):
-        self.container = container
-        self.scale = scale
-        self._determine_image_split("color")
-        self._determine_image_split("alpha")
 
+    def __init__(self, container, export_config):
+        self.container = container
+        self.config = export_config
+        
+        if self.config.upscale_color_with_generator:
+            self._determine_image_split("color")
+        elif self.config.upscale_alpha_with_generator:
+            self._determine_image_split("alpha")
 
     def _determine_image_split(self, channel_type: str) -> None:
         self.split = False  # flag used for code organization
         if channel_type == "color":
             self.size: Tuple[int] = self.container.color_channels.shape
-        else:
+        elif channel_type == "alpha":
             self.size: Tuple[int] = self.container.alpha.shape
         # 262144 the the pixel count of the image, 0.1835 (GiB)
         # is the video memory required process it. The memory
@@ -122,23 +118,16 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         ]  # 4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
         self.split = (
             True
-            if self.size[0] * self.size[1] * self.scale * self.scale > self.max_size_to_split
+            if self.size[0] * self.size[1] * self.config.upscale_factor * self.config.upscale_factor
+            > self.max_size_to_split
             else False
         )
         if self.split:
-            ConfigReference.split_alpha = ConfigReference.split_color = True
+            if channel_type == "color":
+                ConfigReference.split_color = True
+            elif channel_type == "alpha":
+                ConfigReference.split_alpha = True
 
-    def _handle_padding_size(self, size: int) -> int:
-        """
-        Determines the padding size for image splitting
-        based on the user's setting.
-        """
-        # take the lesser of the dimensions since the padding size is a % that,
-        # if dependent on the longer dimension, may exceed the length of the
-        # shorter dimension
-        pad_size = math.floor(0.03 * min(size[:2]) / 2)
-        pad_size = int(pad_size) if pad_size % 2 == 0 else int(pad_size + 1)
-        return pad_size
 
     def _handle_image_split(
         self,
@@ -153,12 +142,13 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         Returns an array of shape (num of patches, c, h,w)
         """
         if self.split:
-            pad_size: int = self._handle_padding_size(self.size)
-
-            lr_image: np.ndarray = pad_reflect(
-                img, pad_size
-            )
+            print("----->>>Splitting image into patches")
+            print("----->size: ", self.size)
+            pad_size: int = handle_padding_size(self.size)
+            print(f"----->Padding size: {pad_size}")
+            lr_image: np.ndarray = pad_reflect(img, pad_size)
             min_ = min(lr_image.shape[:2])
+            print(f"----->Minimum size: {min_}")
             no_patches = 0
             while True:
                 no_patches += 1
@@ -166,7 +156,8 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                 if (patch_size * scale) ** 2 <= self.max_size_to_split:
                     patch_size = math.ceil(min_ / no_patches)
                     break
-            patch_size += 1 if not patch_size % 2 == 0 else 0
+            patch_size += (1 if not patch_size % 2 == 0 else 0)
+            print(f"----->Patch size: {patch_size}")
 
             patches, p_shape = split_image_into_overlapping_patches(
                 lr_image, patch_size=patch_size, padding_size=pad_size
@@ -181,29 +172,28 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         img: np.ndarray,
         channel_type: str,
         generator: "Generator",
-        export_config: dict,
     ) -> torch.Tensor:
 
         full_image, p_shape, pad_size, lr_im_shape = self._handle_image_split(
-            export_config.upscale_factor, img
+            self.config.upscale_factor, img
         )
         if isinstance(full_image, np.ndarray):
             print(f"Patches shape: {full_image.shape}")
             print(f"Patch shape: {p_shape}")
             print(f"Padding size: {pad_size}")
             print(f"Low-res image shape: {lr_im_shape}")
+
         new_patches = None
         i = 0
         if type(full_image) == np.ndarray:
             for patch in full_image:
                 i += 1
-                print(f"Upscaling patch {i}...")
                 if i == 1:
                     new_patches = generator(
                         ConfigReference.inference_transform(image=patch)["image"]
                         .unsqueeze(0)
-                        .to(export_config.device)
-                        .to(dtype=export_config.upscale_precision[1])
+                        .to(self.config.device)
+                        .to(dtype=self.config.upscale_precision[1])
                     ).cpu()
                 else:
                     new_patches = torch.cat(
@@ -214,8 +204,8 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                                     "image"
                                 ]
                                 .unsqueeze(0)
-                                .to(export_config.device)
-                                .to(dtype=export_config.upscale_precision[1])
+                                .to(self.config.device)
+                                .to(dtype=self.config.upscale_precision[1])
                             ).cpu(),
                         ),
                         dim=0,
@@ -223,18 +213,19 @@ class PatchUpscalingStrategy(UpscalingStrategy):
 
             new_patches: torch.Tensor = new_patches.permute((0, 2, 3, 1))
             padded_size_scaled: Tuple[int] = tuple(
-                np.multiply(p_shape[:2], export_config.upscale_factor)
+                np.multiply(p_shape[:2], self.config.upscale_factor)
             ) + (3,)
             scaled_image_shape: Tuple[int] = tuple(
-                np.multiply(lr_im_shape[:2], export_config.upscale_factor)
+                np.multiply(lr_im_shape[:2], self.config.upscale_factor)
             ) + (3,)
             print("Padded size scaled: ", padded_size_scaled)
             print("Scaled image shape: ", scaled_image_shape)
+            print("New patches shape: ", new_patches.shape)
             full_image: torch.Tensor = stitch_together(
                 patches=new_patches,
                 padded_image_shape=padded_size_scaled,
                 target_shape=scaled_image_shape,
-                padding_size=pad_size * export_config.upscale_factor,
+                padding_size=pad_size * self.config.upscale_factor,
             )
 
             del new_patches
