@@ -1,68 +1,80 @@
 from abc import ABC, abstractmethod
 import numpy as np
-from typing import Any, Tuple
+import torch
+
 
 class IImageIO(ABC):
     """Interface for reading and writing images."""
-    
+
     @abstractmethod
     def read_image(self, src_path: str, img_name: str) -> np.ndarray:
         """Reads an image from disk and returns it as a NumPy array."""
         pass
-    
+
     @abstractmethod
-    def write_image(self, image: np.ndarray, trg_path: str, export_config: dict) -> None:
+    def write_image(self) -> None:
         """Writes an image to disk based on export configuration."""
         pass
 
+
 class IImageProcessor(ABC):
     """Interface for image processing operations."""
-    
+
     @abstractmethod
-    def check_all_values_equivalent(self, image: np.ndarray) -> bool:
-        """Checks if all pixel values in an image are the same."""
-        pass
-    
-    @abstractmethod
-    def apply_gamma_correction(self, image: np.ndarray, gamma: float) -> np.ndarray:
-        """Applies gamma correction to an image."""
-        pass
-    
-    @abstractmethod
-    def convert_datatype(self, image: np.ndarray, input: bool) -> np.ndarray:
-        """Converts image datatype before or after processing."""
+    def preprocess_image(
+        self,
+    ) -> None:
+        """Preprocesses the image."""
         pass
 
-class IChannelManager(ABC):
-    """Interface for handling color and alpha channel operations."""
-    
     @abstractmethod
-    def split_channels(self, image: np.ndarray) -> Tuple[np.ndarray, np.ndarray | None]:
-        """Splits an image into color and alpha channels."""
+    def postprocess_image(
+        self,
+    ) -> None:
+        """Postprocesses the image."""
         pass
-    
+
     @abstractmethod
-    def recombine_channels(self, color: np.ndarray, alpha: np.ndarray | None) -> np.ndarray:
-        """Recombines color and alpha channels into a single image."""
+    def process_image(
+        self,
+    ) -> None:
+        """Processes the image."""
         pass
+
 
 class IImageUpscaler(ABC):
     """Interface for image upscaling."""
-    
+
     @abstractmethod
-    def upscale(self, image: np.ndarray, export_config: dict) -> np.ndarray:
+    def scale_image(self) -> torch.Tensor:
         """Upscales an image based on export configuration."""
         pass
 
-class IImageConfig(ABC):
-    """Interface for handling image processing configurations."""
-    
+
+class IImageContainer(ABC):
+    """Interface for an image container class that orchestrates image transformation pipeline"""
+
     @abstractmethod
-    def get_setting(self, key: str) -> Any:
-        """Retrieves a setting from the configuration."""
+    def read_image(self) -> None:
+        """Reads the image from disk."""
         pass
-    
+
     @abstractmethod
-    def update_setting(self, key: str, value: Any) -> None:
-        """Updates a setting in the configuration."""
+    def write_image(self) -> None:
+        """Writes the image to disk."""
+        pass
+
+    @abstractmethod
+    def preprocess_image(self) -> None:
+        """Processes the image, including dimensions, color mode, space, depth and gamma."""
+        pass
+
+    @abstractmethod
+    def postprocess_image(self) -> None:
+        """Postprocesses the image including color mode, space, depth, gamma and noise."""
+        pass
+
+    @abstractmethod
+    def process_image(self) -> None:
+        """Processes the image including upscaling, downscaling, etc."""
         pass

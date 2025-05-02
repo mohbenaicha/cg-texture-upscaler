@@ -2,9 +2,6 @@ from app_config.config import *
 from utils import *
 from utils.logger import write_log_to_file
 
-class ImageContainerInterface:
-    def __init__():
-        raise NotImplementedError
 
 class ImageContainer:
     """
@@ -15,14 +12,14 @@ class ImageContainer:
     """
 
     def __init__(
-        self, img_index: int, src_path: str, trg_path: str, img_name: str, **kwargs
+        self, **kwargs
     ):
-        self.img_index: int = img_index
-        self.src_path: str = src_path
-        self.trg_path: str = trg_path
+        self.img_index: int = kwargs.get("img_index", 0)
+        self.src_path: str = kwargs.get("src_path", None)
+        self.trg_path: str = kwargs.get("trg_path", None)
         self.single_export_location: str = kwargs.get("single_export_location", None)
 
-        self.src_image_name: Optional[str] = img_name
+        self.src_image_name: Optional[str] = kwargs.get("img_name", None)
         self.src_format: Optional[str] = self.src_image_name[-3:]
         self.color_space: Optional[str] = kwargs.get("color_space", None)
         self.write_color_depth: Optional[str] = kwargs.get("export_color_depth", None)
@@ -30,7 +27,7 @@ class ImageContainer:
             "export_color_mode", None
         )  # RGB/RGBA/L/LA
         self.export_format: Optional[str] = kwargs.get("export_format", None)
-        self.trg_image_dtype: Optional[str] = {
+        self.trg_image_dtype: Optional[Dict[str]] = {
             "8": "uint8" if not self.export_format == "exr" else None,
             "16": "uint16" if not self.export_format == "exr" else "float16",
             "32": "float32",
@@ -71,7 +68,7 @@ class ImageContainer:
         self.read_and_preprocess_image()
     
     def optimize_concat(self, channels):
-    # Check if concatenation is necessary
+        # Check if concatenation is necessary
         if len(channels) == 1:
             return channels[0]
         # If channels have the same shape, no need to concatenate
@@ -546,6 +543,7 @@ class ImageContainer:
         self, save_path, im_name: str
     ) -> None:
         self.determine_if_alpha_is_0()
+        cv2.waitKey(0)
         with wand_image.from_array(self.image) as img:
             img.format = self.export_format
 
@@ -578,10 +576,9 @@ class ImageContainer:
                     img.type = "truecolor"
                 elif self.export_mode == "RGBA":
                     img.type = "truecoloralpha"
-
             if self.mipmaps:
                 self.handle_mipmaps(self.mipmaps, img)
-
+            
             img.save(filename=save_path)
 
     def write_opencv_image(self, save_path: str) -> None:
@@ -635,6 +632,7 @@ class ImageContainer:
                     if not "A" in self.export_mode
                     else channels[..., :]
                 )
+                
             else:  # write in RGB
                 temp = np.repeat(channels[:, :, 0], 3)
                 channels = (
@@ -666,6 +664,7 @@ class ImageContainer:
                 channels = (
                     channels[..., :3] if not "A" in self.export_mode else channels
                 )
+                
         return channels
 
     def handle_channel_order(self) -> Self:
@@ -697,7 +696,7 @@ class ImageContainer:
             write_log_to_file(
                 "WARNING",
                 f"Image {self.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
-                "Will affect UV mapping.",
+                " will affect UV mapping.",
             )
             # check if the width and/or height is a multiple of 2
             shape[0] += 1 if w_mod != 0 else 0
@@ -737,7 +736,7 @@ class ImageContainer:
         self.noisy_copy = None
         return self
 
-    def handle_opencv_flags(self) -> None:
+    def handle_opencv_flags(self) -> None: # moved to image config class
         if self.export_format == "png":
             self.opencv_write_flgs = [
                 cv2.IMWRITE_PNG_COMPRESSION,
@@ -760,14 +759,25 @@ class ImageContainer:
                 ].value,  # color depth (16, 32 bit floats)
             ]
 
+    def calc_mipmaps(user_choice: str, image: Image):
+        """
+        Calculates the maximum possible mip levels for an image
+        given its dimensions then sets the level to the lesser of
+        (1) the user's choice or (2) the maximum level
+        """
+        if user_choice == "max":
+            user_choice = float(1)
+        else:
+            user_choice = float(user_choice[:-1]) / 100
+        limiting_dim = math.log2(min(image.size))
+        return str(round(user_choice * limiting_dim, 0))
+    
     def handle_mipmaps(self, mipmaps: str, img):
         """
         img: a wand image object
         """
-        from utils.export_utils import calc_mipmaps
-
         if not mipmaps == "none":
-            num_mipmaps = calc_mipmaps(mipmaps, img)
+            num_mipmaps = self.calc_mipmaps(mipmaps, img)
             img.options["dds:mipmaps"] = num_mipmaps
         else:
             img.options["dds:mipmaps"] = "0"
@@ -783,7 +793,7 @@ class ImageContainer:
         elif not "A" in self.mode:
             self.alpha_0 = True
 
-    def setup_dtype_mapping(self):
+    def setup_dtype_mapping(self): # moved to config class
         # warn of truncation: float64 -> float32/16 , uint16/8 | float32 -> float16, uint16/8 | uint16 -> uint8
         self.output_dtype_mapping = {
             "float16:float32": lambda channels: np.clip(channels, 0.0, 1.0).astype(

@@ -1,7 +1,10 @@
 from datetime import date, datetime
 from pathlib import Path
 from utils import *
+from typing import TYPE_CHECKING
 
+if TYPE_CHECKING:
+    from gui.frames.export_frame import ExportFrame
 
 class Logger:
     _instance = None
@@ -49,3 +52,12 @@ logger = Logger()
 def write_log_to_file(log_type: str, message: str):
     with logger:
         logger.log(log_type, message)
+
+
+def log_to_interface(gui: Union['ExportFrame', None] = None, msg: str = "", cli_verbosity: bool = False, print_img_index: bool = False):
+    if gui:
+        gui.print_export_logs(msg)
+        if print_img_index:
+            gui.print_image_index(msg)
+    if cli_verbosity:
+        print(msg)
