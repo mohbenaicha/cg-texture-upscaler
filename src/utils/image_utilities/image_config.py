@@ -34,7 +34,6 @@ class ImageConfig:
         self.upscale_precision: str = ConfigReference.upscale_precision_levels[
             self.device
         ][kwargs.get("upscale_precision", None)]
-        print("Upscale precision....: ", self.upscale_precision)
         self.compression: Optional[str] = kwargs.get("compression", None)
         self.mipmaps: Optional[str] = kwargs.get("mipmaps", None)
         self.noise_factor: Optional[float] = kwargs.get("noise_level", None)

@@ -283,7 +283,7 @@ def setup_generator(
 ) -> Tuple[Optional['Generator'], Union[int, float]]:
     
     scale = export_config.upscale_factor
-
+    print("Scale factor: ", scale)
     if scale != 1:
         if scale != 0.5:
             try:
@@ -346,9 +346,9 @@ class ModelManager:
     _models = {}
 
     @classmethod
-    def get_model(cls, model_name: str):
+    def get_model(cls, model_name: str) -> Optional[Tuple['Generator', Union[int, float]]]:
         return cls._models.get(model_name)
 
     @classmethod
-    def set_model(cls, model_name: str, model):
-        cls._models[model_name] = model
+    def set_model(cls, model_name: str, model, scale: Union[int, float] = 4) -> None:
+        cls._models[model_name] = (model, scale)

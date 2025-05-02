@@ -30,7 +30,6 @@ def extract_signatures(file_path):
     return signatures
 
 if __name__ == "__main__":
-    # Replace 'your_file.py' with the path to the Python file you want to analyze
     file_path = 'image_container.py'
     try:
         signatures = extract_signatures(file_path)

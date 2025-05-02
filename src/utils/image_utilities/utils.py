@@ -91,7 +91,6 @@ def normalize_uint(image: np.ndarray, minmax_norm: bool = False) -> None:
     Normalize value in a np.array between 0 and 1 or -1 and 1
     """
     dtype = image.dtype
-    print("image.dtype in normalize_uint: ", image.dtype)
     if not minmax_norm:
 
         image = image / (255 if dtype == "uint8" else 65535)
@@ -100,7 +99,6 @@ def normalize_uint(image: np.ndarray, minmax_norm: bool = False) -> None:
         min, max = image.min(), image.max()
         b = 0
         image = (1 - b) * (image - min) / (max - min) - b
-    print("image.dtype after normalize_uint: ", image.dtype)
     return image
 
 
@@ -112,7 +110,6 @@ def convert_input_image_dtype(
     types.
     """
     if channels.dtype == np.uint8 or channels.dtype == np.uint16:
-        print("conditions fulfilled")
         channels = normalize_uint(channels)
 
     # to reduce method bloat, the color space sRGB-Linear conversion is subsumed under data type conversion
@@ -154,17 +151,20 @@ def convert_RGB_to_grayscale(channels: np.ndarray) -> np.ndarray:
     return np.expand_dims(cv2.cvtColor(channels, cv2.COLOR_BGR2GRAY), 2)
 
 
-def add_alpha(trg_image_dtype: str, channels: np.ndarray, opacity: float):
+def add_alpha(channels: np.ndarray, opacity: float):
+# def add_alpha(trg_image_dtype: str, channels: np.ndarray, opacity: float):
     """
     returns a np.array of shape (channels.shape[0] + 1, height, width)
     i.e. with the alpha channel appended to the input channels using the same dtype
     """
     alpha = np.ones(channels.shape[:2], dtype=channels.dtype)
+  
     dtype = (
-        (255 if trg_image_dtype == "uint8" else 65535)
-        if not "float" in trg_image_dtype
+        (255 if channels.dtype == np.uint8 else 65535)
+        if not np.issubdtype(channels.dtype, np.floating)
         else 1
     )
+    print("dtype ---------->", dtype)
     alpha = np.expand_dims(alpha, 2) * opacity * dtype
     return np.concatenate(
         (channels, alpha),
@@ -197,6 +197,7 @@ def process_output_color_mode(
     elif no_channels == 3:  # RGB
         if "L" in export_color_mode:  # write in greyscale
             channels = convert_RGB_to_grayscale(channels)
+
     elif no_channels == 4:  # RGBA
         if "L" in export_color_mode:  # write in greyscale
             channels = convert_RGB_to_grayscale(channels[..., :3])

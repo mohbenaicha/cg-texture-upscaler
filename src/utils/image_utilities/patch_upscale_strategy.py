@@ -9,7 +9,7 @@ from model.utils import (
     stitch_together,
     pad_reflect,
     split_image_into_overlapping_patches,
-    handle_padding_size
+    handle_padding_size,
 )
 
 if TYPE_CHECKING:
@@ -96,10 +96,11 @@ class PatchUpscalingStrategy(UpscalingStrategy):
     def __init__(self, container, export_config):
         self.container = container
         self.config = export_config
-        
+
         if self.config.upscale_color_with_generator:
             self._determine_image_split("color")
-        elif self.config.upscale_alpha_with_generator:
+        
+        if self.config.upscale_alpha_with_generator:
             self._determine_image_split("alpha")
 
     def _determine_image_split(self, channel_type: str) -> None:
@@ -118,7 +119,10 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         ]  # 4096*4096 # assuming 10xx + cards have 4.0 GB of available VRAM, a 2048 x 2048 image should fit; further 2x multiples of these dimensions don't
         self.split = (
             True
-            if self.size[0] * self.size[1] * self.config.upscale_factor * self.config.upscale_factor
+            if self.size[0]
+            * self.size[1]
+            * self.config.upscale_factor
+            * self.config.upscale_factor
             > self.max_size_to_split
             else False
         )
@@ -127,7 +131,6 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                 ConfigReference.split_color = True
             elif channel_type == "alpha":
                 ConfigReference.split_alpha = True
-
 
     def _handle_image_split(
         self,
@@ -142,13 +145,9 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         Returns an array of shape (num of patches, c, h,w)
         """
         if self.split:
-            print("----->>>Splitting image into patches")
-            print("----->size: ", self.size)
             pad_size: int = handle_padding_size(self.size)
-            print(f"----->Padding size: {pad_size}")
             lr_image: np.ndarray = pad_reflect(img, pad_size)
             min_ = min(lr_image.shape[:2])
-            print(f"----->Minimum size: {min_}")
             no_patches = 0
             while True:
                 no_patches += 1
@@ -156,9 +155,7 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                 if (patch_size * scale) ** 2 <= self.max_size_to_split:
                     patch_size = math.ceil(min_ / no_patches)
                     break
-            patch_size += (1 if not patch_size % 2 == 0 else 0)
-            print(f"----->Patch size: {patch_size}")
-
+            patch_size += 1 if not patch_size % 2 == 0 else 0
             patches, p_shape = split_image_into_overlapping_patches(
                 lr_image, patch_size=patch_size, padding_size=pad_size
             )
@@ -177,12 +174,6 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         full_image, p_shape, pad_size, lr_im_shape = self._handle_image_split(
             self.config.upscale_factor, img
         )
-        if isinstance(full_image, np.ndarray):
-            print(f"Patches shape: {full_image.shape}")
-            print(f"Patch shape: {p_shape}")
-            print(f"Padding size: {pad_size}")
-            print(f"Low-res image shape: {lr_im_shape}")
-
         new_patches = None
         i = 0
         if type(full_image) == np.ndarray:
@@ -218,9 +209,6 @@ class PatchUpscalingStrategy(UpscalingStrategy):
             scaled_image_shape: Tuple[int] = tuple(
                 np.multiply(lr_im_shape[:2], self.config.upscale_factor)
             ) + (3,)
-            print("Padded size scaled: ", padded_size_scaled)
-            print("Scaled image shape: ", scaled_image_shape)
-            print("New patches shape: ", new_patches.shape)
             full_image: torch.Tensor = stitch_together(
                 patches=new_patches,
                 padded_image_shape=padded_size_scaled,

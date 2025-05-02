@@ -18,7 +18,6 @@ class ImageContainer(IImageContainer):
         self.image: Optional[Union[torch.Tensor, np.ndarray]] = None
         self.noisy_copy: Optional[np.ndarray] = None
         self.config = ImageConfig(**kwargs) # unique per-image config, may contained shared state config
-        print("Orchestrator config setup successfully")
         self._image_io = ImageIO(self) 
         self._image_processor = ImageProcessor(
             self, gamma_adjustment=ExportConfig.gamma_adjustment

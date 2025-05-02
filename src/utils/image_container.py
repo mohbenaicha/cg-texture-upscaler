@@ -579,10 +579,6 @@ class ImageContainer:
             if self.mipmaps:
                 self.handle_mipmaps(self.mipmaps, img)
             
-            print("image.type", img.type)
-            print("image.compression", img.compression)
-            print("image.format", img.format)
-
             img.save(filename=save_path)
 
     def write_opencv_image(self, save_path: str) -> None:
@@ -700,7 +696,7 @@ class ImageContainer:
             write_log_to_file(
                 "WARNING",
                 f"Image {self.src_image_name} has dimensions {shape[0]}x{shape[1]}. Upscaling this image"
-                "Will affect UV mapping.",
+                " will affect UV mapping.",
             )
             # check if the width and/or height is a multiple of 2
             shape[0] += 1 if w_mod != 0 else 0
