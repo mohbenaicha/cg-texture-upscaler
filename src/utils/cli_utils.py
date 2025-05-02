@@ -496,7 +496,6 @@ def parse_args(args: argparse.ArgumentParser):
     expconf.gamma_adjustment = export_config["gamma_adjustment"]
     expconf.split_large_image = export_config["split_large_image"]
     expconf.patch_size = export_config["image_split_size"]
-    expconf.cli_verbosity = export_config["verbose"]
 
     pprint.pprint(export_config)
     return export_config

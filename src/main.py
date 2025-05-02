@@ -10,6 +10,8 @@ from gui.frames import ExportThread
 from gui.message_box import CTkMessagebox
 
 
+
+
 def main(args: Union[Dict[str, int | str | float], None]):
     ''' Main program driver that executes a GUI loop or initiates an export
     thread based on the user's parsed and cleaned command line parameters.'''
@@ -40,6 +42,7 @@ def main(args: Union[Dict[str, int | str | float], None]):
                 sys.exit(1)
 
         master_frame.mainloop()
+
 
 if __name__ == "__main__":
     if len(sys.argv) > 1:

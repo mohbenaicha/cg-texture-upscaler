@@ -5,13 +5,13 @@ This repo contains the source code for the official CG Texture Upscaler, a tool 
 **To use in a Python environment:**
 
 1. ```git pull https://github.com/mohbenaicha/cg-texture-upscaler.git```
-2. Setup a new Python environment using ```pip install -r requirements.txt``` for GPU-based upscaling:
-   * for CPU upscaling, comment out the GPU-based torch libraries and uncommment the CPU-based ones
-3. Download the model weights from: 
-   * standard weights https://drive.google.com/file/d/1ZOM7wYJGj1BiHemL9jAgzKX-AiaDQXH7/view?usp=sharing
-   * weights for jit compiled network: https://drive.google.com/file/d/1F3LETd42BIMiLw2GcGEITyqmw25fW91h/view?usp=sharing (need to uncomment lines in the load_model() in export_utils.py)
-4. Extract the ```saved_models.rar``` folders into ```/cg-texture-upscaler``` folder. They should end up in a saved_models folder (extract the jit-compiled weights in there like wise if using those)
-5. Run ```python main.py``` using the interpreter in the newly-setup environment  
+2. Setup a new Python environment using ```pip install -r requirements.txt```
+3. Based on the version of the application you wish you use, further execute one of the following commands:
+    * For CPU-based upscaling: ```pip install torch torchvision torchaudio```
+    * For GPU-based upscaling: ```pip3 install pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu117 (not tested on Cuda 11.8)```
+4. Download the model weights from: https://drive.google.com/file/d/1ZOM7wYJGj1BiHemL9jAgzKX-AiaDQXH7/view?usp=sharing
+5. Extract the ```saved_models.rar``` folders into ```/cg-texture-upscaler``` folder
+6. Run ```python main.py``` using the interpreter in the newly-setup environment  
 
 **To use the release version:**
 

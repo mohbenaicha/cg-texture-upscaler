@@ -49,7 +49,7 @@ class RegularUpscalingStrategy(UpscalingStrategy):
     upscale(full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict) -> torch.Tensor
         Returns the input image without any modifications.
     """
-    def upscale(self, full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict, scale: float) -> torch.Tensor:
+    def upscale(self, full_image: np.ndarray, channel_type: str, generator: Generator, export_config: dict) -> torch.Tensor:
         return full_image.color_channels if channel_type == "color" else full_image.alpha
 
 class PatchUpscalingStrategy(UpscalingStrategy):
@@ -112,14 +112,12 @@ class PatchUpscalingStrategy(UpscalingStrategy):
 
         if split:
             if channel_type == "color":
-                print("Splitting color channels")
                 confref.split_color = True
             else:
-                print("Splitting alpha channel")
                 confref.split_alpha = True
-                print("ConfigReference.split_alpha: ", confref.split_alpha)
             if ExportConfig.split_large_image:
                 pad_size: int = self.handle_padding_size(size)
+
                 lr_image: np.ndarray = pad_reflect(
                     img.color_channels if channel_type == "color" else img.alpha, pad_size
                 )
@@ -132,9 +130,11 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                         patch_size = math.ceil(min_ / no_patches)
                         break
                 patch_size += (1 if not patch_size % 2 == 0 else 0)
+
                 patches, p_shape = split_image_into_overlapping_patches(
                     lr_image, patch_size=patch_size, padding_size=pad_size
                 )
+               
                 return patches, p_shape, pad_size, size
         else:
             return (None,) * 4
@@ -150,6 +150,7 @@ class PatchUpscalingStrategy(UpscalingStrategy):
         full_image, p_shape, pad_size, lr_im_shape = self.handle_image_split(channel_type, scale, img)
         new_patches = None
         i = 0
+
         if type(full_image) == np.ndarray:
 
             for patch in full_image:
@@ -184,7 +185,10 @@ class PatchUpscalingStrategy(UpscalingStrategy):
                     )
             new_patches: torch.Tensor = new_patches.permute((0, 2, 3, 1))
             padded_size_scaled: Tuple[int] = tuple(np.multiply(p_shape[:2], scale)) + (3,)
-            scaled_image_shape: Tuple[int] = tuple(np.multiply(lr_im_shape[:2], scale)) + (3,)
+            scaled_image_shape: Tuple[int] = tuple(np.multiply(lr_im_shape[:2], scale)) + (
+                3,
+            )
+
             full_image: torch.Tensor = stitch_together(
                 patches=new_patches,
                 padded_image_shape=padded_size_scaled,

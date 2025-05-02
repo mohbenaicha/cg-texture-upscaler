@@ -110,6 +110,5 @@ class MasterFrame(ctk.CTk):
         )
 
         self.export_options_frame.addit_sett_subframe = self.additional_settings_frame
-
     def exit_and_close_log_file(self):
         self.destroy()

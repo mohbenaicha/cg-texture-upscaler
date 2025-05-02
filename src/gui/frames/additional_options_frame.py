@@ -258,7 +258,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             dynamic_resizing=False,
             command=self.on_color_depth_change,
             variable=self.color_depth,
-            height=22,
+            height=20,
             width=80,
             font=fonts.buttons_font(),
         )
@@ -285,7 +285,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             dynamic_resizing=False,
             command=self.on_color_mode_change,
             variable=self.color_mode,
-            height=22,
+            height=20,
             width=140,
             font=fonts.small_buttons_font(),
         )
@@ -312,7 +312,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             dynamic_resizing=False,
             command=self.on_color_space_change,
             variable=self.color_space,
-            height=22,
+            height=20,
             width=140,
             font=fonts.small_buttons_font(),
         )
@@ -340,7 +340,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             values=ConfigReference.available_devices,
             command=self.on_device_change,
             variable=self.device,
-            height=22,
+            height=20,
             width=80,
             font=fonts.buttons_font(),
         )
@@ -366,7 +366,7 @@ class AdditionalOptionsFrame(ctk.CTkFrame):
             values=list(confref.upscale_precision_levels["cuda"].keys()),
             command=self.on_upscale_precision_change,
             variable=self.upscale_precision,
-            height=22,
+            height=20,
             width=80,
             font=fonts.buttons_font(),
         )

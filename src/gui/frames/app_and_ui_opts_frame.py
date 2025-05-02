@@ -17,16 +17,16 @@ if TYPE_CHECKING:
 class AppAndUIOptions(ctk.CTkFrame):
     def __init__(self, master: ctk.CTk, **kwargs):
         super().__init__(master)
-        self.fof_frame: 'FileOrFolderFrame' = kwargs.get("fof_frame")
-        self.filter_frame: 'SearchFilterFrame' = kwargs.get("filter_frame")
-        self.expopts_frame: 'ExportOptionsFrame' = kwargs.get("expopts_frame")
-        self.export_frame: 'ExportFrame' = kwargs.get("export_frame")
+        self.fof_frame: FileOrFolderFrame = kwargs.get("fof_frame")
+        self.filter_frame: SearchFilterFrame = kwargs.get("filter_frame")
+        self.expopts_frame: ExportOptionsFrame = kwargs.get("expopts_frame")
+        self.export_frame: ExportFrame = kwargs.get("export_frame")
         self.configure(width=kwargs.get("width"))
         self.odd = False
-        self.lb_frame: 'TkListbox' = kwargs.get("lb_frame")
-        self.addit_sett_frame: 'AdditionalOptionsFrame' = kwargs.get("addit_sett_frame")
-        self.save_toplevel_window: None | 'SaveConfigWindow' = None
-        self.load_toplevel_window: None | 'LoadConfigWindow' = None
+        self.lb_frame: TkListbox = kwargs.get("lb_frame")
+        self.addit_sett_frame: AdditionalOptionsFrame = kwargs.get("addit_sett_frame")
+        self.save_toplevel_window: None | SaveConfigWindow = None
+        self.load_toplevel_window: None | LoadConfigWindow = None
         self.setup_subframes()
 
     def setup_subframes(self):
