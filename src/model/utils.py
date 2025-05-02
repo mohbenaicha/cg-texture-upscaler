@@ -283,7 +283,6 @@ def setup_generator(
 ) -> Tuple[Optional['Generator'], Union[int, float]]:
     
     scale = export_config.upscale_factor
-    print("Scale factor: ", scale)
     if scale != 1:
         if scale != 0.5:
             try:

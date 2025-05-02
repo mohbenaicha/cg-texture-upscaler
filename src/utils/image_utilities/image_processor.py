@@ -69,8 +69,6 @@ class ImageProcessor(IImageProcessor):
                 ModelManager.set_model(method, model, scale)
             else:
                 # if scale is changed in settings, generator has to be reset
-                print("Model found, scale is", ModelManager.get_model(method)[1])
-                print("Current scale is", self.config.upscale_factor)
                 if self.config.upscale_factor != ModelManager.get_model(method)[1]:
                     model, _ = setup_generator(self.config, None)
                     ModelManager.set_model(method, model, self.config.upscale_factor)
@@ -248,14 +246,12 @@ class ImageProcessor(IImageProcessor):
                         "WARNING",
                         f"Using linear scaling to scale image {self.config.src_image_name}'s alpha channel.",
                     )
-                    print("Alpha channel is a single value, shape:", self.container.alpha.shape)
                     self.container.alpha = upscale_linear(  # todo
                         self.container.alpha,
                         self.config.upscale_factor,
                         alpha_max,
                         self.config.upscale_precision,
                     )
-                    print("Alpha channel after linear upscale:", self.container.alpha.shape)
                     self.container.config.upscale_alpha_with_generator = False
                     self.alpha_scale_linear = True
 
@@ -354,10 +350,8 @@ class ImageProcessor(IImageProcessor):
                 if alpha_dims == 2:
                     self.container.alpha = self.container.alpha.unsqueeze(0)
                 if t_alpha == torch.Tensor:
-                    print("Alpha shape before permute after upscale:", self.container.alpha.shape)
                     if ConfigReference.split_alpha and t_alpha == torch.Tensor:
                         self.container.alpha = self.container.alpha.permute(2, 0, 1)
-                    print("Alpha shape after permute after upscale:", self.container.alpha.shape)
                     
                     # todo: check if it should be under this condition
                     self.container.alpha = (
@@ -365,7 +359,6 @@ class ImageProcessor(IImageProcessor):
                         + self.container.alpha[1] * (0.5870)
                         + self.container.alpha[2] * (0.1140)
                     ).unsqueeze(0)
-                    print("Alpha shape after unsqueeze after upscale:", self.container.alpha.shape)
             else:
                 
                 if t_alpha == np.ndarray:
@@ -411,10 +404,6 @@ class ImageProcessor(IImageProcessor):
                 self.container.color_channels = self.container.color_channels.numpy()
 
         if not t_alpha == type(None):
-            print("alpha shape:")
-            print(self.container.alpha.shape)
-            print("color shape:")
-            print(self.container.color_channels.shape)
             self.container.image = np.concatenate(
                 (self.container.color_channels, self.container.alpha),
                 axis=(0 if self.config.upscale_factor != 0.5 else 2),
