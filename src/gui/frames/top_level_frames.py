@@ -184,11 +184,11 @@ class SaveConfigWindow(ctk.CTkToplevel):
 
 
 class FilterDimensionsWindow(ctk.CTkToplevel):
-    def __init__(self, lb_frame: TkListbox, *args, **kwargs):
+    def __init__(self, lb_frame: 'TkListbox', *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.geometry = "200x400"
         self.title("Filter by Dimensions")
-        self.lb_frame: TkListbox = lb_frame
+        self.lb_frame: 'TkListbox' = lb_frame
         self.label = ctk.CTkLabel(
             self,
             text="Enter a filter string like: width,height,operator (i.e 1024,512,>)",
@@ -311,7 +311,7 @@ class LoadConfigWindow(ctk.CTkToplevel):
         self.filter_frame: SearchFilterFrame = kwargs.get("filter_frame")
         self.exp_opts_frame: ExportOptionsFrame = kwargs.get("exp_opts_frame")
         self.addit_sett_frame: AdditionalOptionsFrame = kwargs.get("addit_sett_frame")
-        self.lb_frame: TkListbox = kwargs.get("lb_frame")  # image file populate listbox
+        self.lb_frame: 'TkListbox' = kwargs.get("lb_frame")  # image file populate listbox
         self.export_frame: ExportFrame = kwargs.get("export_frame")
 
         self.label = ctk.CTkLabel(self, text="Select a configuration to load:")

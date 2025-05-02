@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 from tkinter import *
 import customtkinter as ctk
 import math
@@ -8,6 +7,7 @@ from app_config.config import ExportConfig, ConfigReference, GUIConfig
 from utils.events import *
 import gui.tooltips.tooltip_text as ttt
 
+from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from gui.frames import TkListbox, AdditionalOptionsFrame
 
@@ -16,8 +16,8 @@ class ExportOptionsFrame(ctk.CTkFrame):
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
         # options variable definitions
-        self.lb_frame: TkListbox = kwargs.get("lb_frame")
-        self.addit_sett_subframe: AdditionalOptionsFrame = kwargs.get(
+        self.lb_frame: 'TkListbox' = kwargs.get("lb_frame")
+        self.addit_sett_subframe: 'AdditionalOptionsFrame' = kwargs.get(
             "addit_sett_subframe"
         )
         self.height: int = kwargs.get("height")
@@ -99,10 +99,13 @@ class ExportOptionsFrame(ctk.CTkFrame):
             dynamic_resizing=False,
             command=self.set_scale,
             variable=self.scale,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
+            
+
         )
+
         self.scale_subframe.menu.set(value=ExportConfig.scale)
         self.scale_subframe.menu_tt = Hovertip_Frame(
             anchor_widget=self.scale_subframe.label,
@@ -126,7 +129,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             values=ConfigReference.available_export_formats,
             command=self.set_format,
             variable=self.format,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
         )
@@ -153,7 +156,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             values=ExportConfig.active_compression,
             command=self.set_compression,
             variable=self.cat_compression_value,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
         )
@@ -258,7 +261,7 @@ class ExportOptionsFrame(ctk.CTkFrame):
             values=ConfigReference.mipmap_levels,
             command=self.set_mipmaps,
             variable=self.mipmaps,
-            height=20,
+            height=22,
             width=60,
             font=fonts.buttons_font(),
         )

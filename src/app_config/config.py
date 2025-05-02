@@ -11,11 +11,27 @@ class GUIScale(Enum):
     medium: int = 2
     large: int = 3
 
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
+
 
 class GUITheme(Enum):
     light: int = 1
     dark: int = 2
     contrast: int = 3
+
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
 
 
 class EXR_COMPRESSION_TYPES(Enum):
@@ -30,10 +46,26 @@ class EXR_COMPRESSION_TYPES(Enum):
     DWAA: int = 8
     DWAB: int = 9
 
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
+
 
 class EXR_DEPTH(Enum):
     HALF: int = 1
     FLOAT: int = 2
+
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
 
 
 class ConfigReference:
@@ -70,7 +102,12 @@ class ConfigReference:
     }
     discrete_compression_map: Dict[str, Tuple[str]] = {
         "bmp": ("none", "rle"),
-        "dds": ("none", "dxt1", "dxt3", "dxt5"), #,"automatic"), # not working consistently
+        "dds": (
+            "none",
+            "dxt1",
+            "dxt3",
+            "dxt5",
+        ),  # ,"automatic"), # not working consistently
         "tga": ("none", "rle"),
         "exr": tuple(EXR_COMPRESSION_TYPES.__members__.keys()),
     }
@@ -151,12 +188,20 @@ class ConfigReference:
         "float32:uint8",
         "uint16:uint8",
     )
-    split_sizes: dict[str,Tuple[str, int]] = {
-        "1": ("small", 1024*1024),
-        "2": ("medium", 2048*2048),
-        "3": ("large", 4096*4096),
-        "4": ("extra large", 8192*8192)
+    split_sizes: dict[str, Tuple[str, int]] = {
+        "1": ("small", 1024 * 1024),
+        "2": ("medium", 2048 * 2048),
+        "3": ("large", 4096 * 4096),
+        "4": ("extra large", 8192 * 8192),
     }
+
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
 
 
 class SearchConfig:
@@ -188,8 +233,16 @@ class SearchConfig:
         "<=": lambda a, b: (a[0] <= b[0]) and (a[1] <= b[1]),
         ">": lambda a, b: (a[0] > b[0]) and (a[1] > b[1]),
         "<": lambda a, b: (a[0] < b[0]) and (a[1] < b[1]),
-        "!=": lambda a, b: (a[0] != b[0]) and (a[1] != b[1])
+        "!=": lambda a, b: (a[0] != b[0]) and (a[1] != b[1]),
     }
+
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
 
 
 class ExportConfig:
@@ -197,9 +250,9 @@ class ExportConfig:
     scale: str = ConfigReference.available_scales[0]
     export_format: str = "tga"
     compression: str = "none"
-    active_compression: Tuple[
-        Union[str, None]
-    ] = ConfigReference.discrete_compression_map[export_format]
+    active_compression: Tuple[Union[str, None]] = (
+        ConfigReference.discrete_compression_map[export_format]
+    )
     mipmaps: str = "none"
     save_numbering: bool = False
     save_prefix: str = ""
@@ -216,11 +269,20 @@ class ExportConfig:
     # TODO: implement
     split_large_image: bool = True
     patch_size: str = "3"
+    cli_verbosity: bool = False
+
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
 
 
 class GUIConfig:
     master_default_width: int = 765
-    master_default_height: int = 1070
+    master_default_height: int = 1100
     tab_view_height: int = 1062
     tab_view_width: int = 1  # overidden by column frames
     main_listbox_height: int = 35
@@ -249,10 +311,56 @@ class GUIConfig:
     rel_config_path: str = "./user_config/"
     rel_log_path: str = "./logs/"
 
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
+
 
 class TechnicalConfig:
-    gui_version: str = "0.0.6"
-    cli_version: str = "0.0.5"
-    app_display_name: str = "CG Texture Upscaler" 
-    app_cli_name: str = "CG Texture Upscaler CLI" 
-    app_author: str = "Mohamed Benaicha" 
+    gui_version: str = "0.0.7"
+    cli_version: str = "0.0.6"
+    app_display_name: str = "CG Texture Upscaler"
+    app_cli_name: str = "CG Texture Upscaler CLI"
+    app_author: str = "Mohamed Benaicha"
+
+    @classmethod
+    def get(cls, attribute: str):
+        return getattr(cls, attribute, None)
+
+    @classmethod
+    def set(cls, attribute: str, value):
+        setattr(cls, attribute, value)
+
+# filepath: c:\Users\Moham\Desktop\career\official_cg_tool_dev_repo\src\utils\image_utilities\image_dtype_mapping.py
+
+import numpy as np
+
+class DTypeMapping:
+    mapping = {
+        "float16:float32": lambda channels: np.clip(channels, 0.0, 1.0).astype("float32"),
+        "float16:uint8": lambda channels: (np.clip(channels, 0.0, 1.0) * 255).astype("uint8"),
+        "float16:uint16": lambda channels: (np.clip(channels, 0.0, 1.0) * 65535).astype("uint16"),
+        "float16:float16": lambda channels: np.clip(channels, 0.0, 1.0).astype("float16"),
+        "float32:float16": lambda channels: np.clip(channels, 0.0, 1.0).astype("float16"),
+        "float32:float32": lambda channels: np.clip(channels, 0.0, 1.0).astype("float32"),
+        "float32:uint8": lambda channels: (np.clip(channels, 0.0, 1.0) * 255).astype("uint8"),
+        "float32:uint16": lambda channels: (np.clip(channels, 0.0, 1.0) * 65535).astype("uint16"),
+        "float64:float32": lambda channels: np.clip(channels, 0.0, 1.0).astype("float32"),
+        "float64:float16": lambda channels: np.clip(channels, 0.0, 1.0).astype("float16"),
+        "float64:uint16": lambda channels: (np.clip(channels, 0.0, 1.0) * 65535).astype("uint16"),
+        "float64:uint8": lambda channels: (np.clip(channels, 0.0, 1.0) * 255).astype("uint8"),
+        "uint8:uint8": lambda channels: channels,
+        "uint8:uint16": lambda channels: ((channels.astype("uint16")) * 255),
+        "uint8:float32": lambda channels: DTypeMapping.normalize_uint(image=channels).astype("float32"),
+        "uint16:uint16": lambda channels: channels,
+        "uint16:uint8": lambda channels: (channels / 255).astype("uint8"),
+        "uint16:float32": lambda channels: DTypeMapping.normalize_uint(image=channels).astype("float32"),
+    }
+
+    @staticmethod
+    def normalize_uint(image):
+        return image / 65535.0 if image.dtype == np.uint16 else image / 255.0
